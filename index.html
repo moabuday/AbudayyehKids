@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Kids Chore Points</title>
+<style>
+:root{
+  --bg:#f6f7fb;--card:#ffffff;--fg:#14161f;--muted:#4b5163;--border:#e2e5ee;--soft:#eef0f6;
+  --primary:#3b4fc4;--primary-fg:#ffffff;--primary-soft:#e7eafb;
+  --ok:#0f7a4a;--ok-soft:#e3f6ec;--ok-fg:#0b4d30;
+  --bad:#b42318;--bad-soft:#fde8e6;--bad-fg:#7a1a12;
+  --info:#1d5fbf;--info-soft:#e4eefc;--info-fg:#143f7f;
+  --gold:#b45309;--gold-soft:#fdf0dc;--gold-fg:#6b3407;--gold-mark:#f59e0b;
+  --radius:14px;--shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1117;--card:#181b24;--fg:#f2f3f7;--muted:#b4b9c8;--border:#2b2f3c;--soft:#222633;
+    --primary:#7d8cf0;--primary-fg:#0f1117;--primary-soft:#262c4d;
+    --ok:#4ccf8f;--ok-soft:#12301f;--ok-fg:#c8f2dc;
+    --bad:#ff8a80;--bad-soft:#3a1715;--bad-fg:#ffd5d0;
+    --info:#86b4ff;--info-soft:#152844;--info-fg:#d3e3ff;
+    --gold:#fbbf24;--gold-soft:#3a2a0e;--gold-fg:#fde7b0;--gold-mark:#f59e0b;
+    --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",Arial,sans-serif;background:var(--bg);color:var(--fg)}
+body{margin:0;min-height:100vh;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+.wrap{max-inline-size:1120px;margin-inline:auto;padding:20px 16px 48px}
+header.top{position:sticky;inset-block-start:0;z-index:10;background:var(--card);border-block-end:1px solid var(--border)}
+header.top .wrap{display:flex;align-items:center;gap:12px;padding-block:10px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:1.05rem}
+.logo{inline-size:34px;block-size:34px;border-radius:10px;background:var(--primary);display:grid;place-items:center}
+.logo svg{inline-size:20px;block-size:20px;fill:var(--primary-fg)}
+.family{color:var(--muted);font-weight:500;font-size:.95rem}
+.spacer{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid transparent;border-radius:10px;padding:8px 14px;font-weight:600;cursor:pointer;background:var(--primary);color:var(--primary-fg);min-block-size:38px}
+.btn:hover{filter:brightness(1.07)}
+.btn.outline{background:var(--card);color:var(--fg);border-color:var(--border)}
+.btn.ghost{background:transparent;color:var(--fg)}
+.btn.ghost:hover,.btn.outline:hover{background:var(--soft);filter:none}
+.btn.danger{background:var(--bad);color:#fff}
+.btn.sm{padding:5px 10px;min-block-size:32px;font-size:.9rem}
+.btn.icon{padding:6px;min-inline-size:34px;min-block-size:34px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+h1{font-size:1.6rem;margin:0}
+h2{font-size:1.15rem;margin:0 0 12px}
+h3{font-size:1rem;margin:0}
+.muted{color:var(--muted)}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.grid2{display:grid;gap:20px;grid-template-columns:1.15fr 1fr}
+@media (max-width:860px){.grid2{grid-template-columns:1fr}}
+.alert{border:1px solid var(--gold);background:var(--gold-soft);color:var(--gold-fg);border-radius:10px;padding:10px 14px;margin-block-end:16px}
+.avatar{inline-size:38px;block-size:38px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;flex:none}
+.avatar.lg{inline-size:60px;block-size:60px;font-size:1.6rem}
+.avatar.sm{inline-size:28px;block-size:28px;font-size:.8rem}
+.c0{background:#1d6fa5}.c1{background:#be123c}.c2{background:#047857}.c3{background:#6d28d9}.c4{background:#b45309}.c5{background:#0f766e}
+.kidpick{display:flex;gap:10px;flex-wrap:wrap;margin-block-end:20px}
+.kidbtn{display:flex;align-items:center;gap:10px;border:2px solid var(--border);background:var(--card);border-radius:999px;padding:4px 16px 4px 4px;cursor:pointer;font-weight:600}
+.kidbtn[aria-pressed="true"]{border-color:var(--primary);box-shadow:0 0 0 2px var(--primary)}
+.score{display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-block-end:20px}
+.big{font-size:2.2rem;font-weight:800;font-variant-numeric:tabular-nums}
+.bar{block-size:10px;background:var(--primary-soft);border-radius:999px;overflow:hidden}
+.bar>span{display:block;block-size:100%;background:var(--primary);border-radius:999px}
+ul.clean{list-style:none;margin:0;padding:0}
+.task{display:flex;align-items:center;gap:12px;inline-size:100%;text-align:start;min-block-size:58px;border:1px solid var(--border);background:var(--card);border-radius:12px;padding:8px 12px;cursor:pointer;margin-block-end:8px}
+.task:hover{background:var(--soft)}
+.task[aria-pressed="true"]{border-color:var(--ok);background:var(--ok-soft)}
+.tick{inline-size:32px;block-size:32px;border-radius:50%;border:2px solid var(--border);display:grid;place-items:center;flex:none}
+.task[aria-pressed="true"] .tick{background:var(--ok);border-color:var(--ok)}
+.tick svg{inline-size:18px;block-size:18px;stroke:#fff;fill:none;stroke-width:3;display:none}
+@media (prefers-color-scheme: dark){.tick svg{stroke:#0f1117}}
+.task[aria-pressed="true"] .tick svg{display:block}
+.task .t{flex:1;font-weight:600}
+.pill{border-radius:999px;padding:2px 10px;font-size:.85rem;font-weight:700;font-variant-numeric:tabular-nums;background:var(--soft);color:var(--fg);white-space:nowrap}
+.task[aria-pressed="true"] .pill{background:var(--ok);color:var(--card)}
+.b-task{background:var(--ok-soft);color:var(--ok-fg)}
+.b-bonus{background:var(--info-soft);color:var(--info-fg)}
+.b-deduction{background:var(--bad-soft);color:var(--bad-fg)}
+.b-reward{background:var(--gold-soft);color:var(--gold-fg)}
+.list>li{display:flex;align-items:center;gap:12px;padding:10px 0;border-block-end:1px solid var(--border)}
+.list>li:last-child{border-block-end:0}
+.grow{flex:1;min-inline-size:0}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.amt{font-weight:800;font-variant-numeric:tabular-nums;min-inline-size:3.2em;text-align:end}
+.amt.pos{color:var(--ok)}.amt.neg{color:var(--bad)}
+.small{font-size:.85rem}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;border-block-end:1px solid var(--border);margin-block-end:20px}
+.tab{background:none;border:0;border-block-end:3px solid transparent;padding:10px 14px;font-weight:600;color:var(--muted);cursor:pointer}
+.tab[aria-selected="true"]{color:var(--fg);border-block-end-color:var(--primary)}
+.kidcards{display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-block:12px}
+form.stack{display:grid;gap:12px}
+label.f{display:grid;gap:5px;font-weight:600;font-size:.92rem}
+input[type=text],input[type=number],input[type=password],select{border:1px solid var(--border);background:var(--card);border-radius:10px;padding:9px 11px;min-block-size:40px;inline-size:100%}
+.seg{display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.seg label{flex:1;text-align:center;padding:8px;cursor:pointer;font-weight:600}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:var(--primary);color:var(--primary-fg)}
+.seg label:has(input:focus-visible){outline:3px solid var(--primary);outline-offset:-3px}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.swatches label{cursor:pointer}
+.swatches input{position:absolute;opacity:0}
+.swatches .avatar{border:3px solid transparent}
+.swatches input:checked + .avatar{border-color:var(--fg)}
+.swatches input:focus-visible + .avatar{outline:3px solid var(--primary);outline-offset:2px}
+.checks{display:flex;flex-wrap:wrap;gap:8px 16px}
+.checks label{display:flex;align-items:center;gap:6px;font-weight:500}
+.err{color:var(--bad);font-size:.9rem;margin:0}
+dialog{border:1px solid var(--border);border-radius:16px;background:var(--card);color:var(--fg);padding:22px;inline-size:min(460px,92vw)}
+dialog::backdrop{background:rgba(10,12,20,.55)}
+.actions{display:flex;justify-content:flex-end;gap:8px;margin-block-start:6px}
+.hero{max-inline-size:520px;margin:40px auto}
+.empty{padding:24px;text-align:center;color:var(--muted)}
+figure{margin:0}
+svg text{font-family:inherit}
+.week{display:flex;align-items:flex-end;gap:6px;block-size:70px;margin-block:8px 2px}
+.week div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;block-size:100%}
+.week i{display:block;inline-size:100%;background:var(--primary);border-radius:4px 4px 0 0;min-block-size:2px}
+.week b{font-size:.72rem;font-weight:600;color:var(--muted)}
+.weeklbl{display:flex;gap:6px}.weeklbl span{flex:1;text-align:center;font-size:.72rem;color:var(--muted)}
+.sr{position:absolute;inline-size:1px;block-size:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.toast{position:fixed;inset-block-end:20px;inset-inline-start:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 18px;border-radius:999px;font-weight:600;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+footer{color:var(--muted);font-size:.85rem;text-align:center;padding:24px}
+@media (forced-colors: active){.btn,.task,.kidbtn,.tab{border:1px solid ButtonText}.task[aria-pressed="true"],.kidbtn[aria-pressed="true"],.tab[aria-selected="true"]{outline:3px solid Highlight}}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="brand"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.4 5 5.4.6-4 3.7 1.1 5.4L12 15.5l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/></svg></span>Kids Chore Points</div>
+  <span class="family" id="familyName"></span>
+  <span class="spacer"></span>
+  <nav id="nav" class="row" aria-label="Main"></nav>
+</div></header>
+<main id="app" class="wrap" tabindex="-1"></main>
+<footer>Data is saved in this browser on this device. Use Parent panel → Settings → Download backup to move it to another device.</footer>
+<dialog id="dlg" aria-labelledby="dlgTitle"></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+var KEY="kidsChorePoints:v1";
+var VERSION=1;
+var COLORS=6;
+var DEFAULT_TASKS=[["Make your bed",5],["Get dressed by yourself",5],["Brush teeth (morning & night)",3],["Help mom with cleaning",10],["Tidy up your toys",5],["Finish homework",10],["Help set the table",5]];
+var DEFAULT_REWARDS=[["Ice cream treat",30],["Extra 30 min screen time",50],["Trip to the park",100],["Pick a new toy",200]];
+var QUICK=[["Good behaviour",5],["Extra helpful",10],["Not listening",-5],["Fighting",-10]];
+var TYPE_LABEL={task:"Task",bonus:"Bonus",deduction:"Deducted",reward:"Reward"};
+
+/* ---------- utils ---------- */
+function uid(){try{return crypto.randomUUID();}catch(e){return Date.now().toString(36)+Math.random().toString(36).slice(2,10);}}
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function dkey(d){d=d||new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function fmt(n){return (n>0?"+":n<0?"\u2212":"")+Math.abs(n);}
+function dayLabel(k){var t=dkey();if(k===t)return "Today";var y=new Date();y.setDate(y.getDate()-1);if(k===dkey(y))return "Yesterday";var p=k.split("-").map(Number);return new Date(p[0],p[1]-1,p[2]).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}
+function initial(n){return (String(n).trim().charAt(0)||"?").toUpperCase();}
+function avatar(k,size){return '<span class="avatar '+(size||"")+' c'+(k.color%COLORS)+'" aria-hidden="true">'+esc(initial(k.name))+'</span>';}
+function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove("show");},2200);}
+function fallbackHash(s){var h1=0x811c9dc5,h2=0x1b873593;for(var i=0;i<s.length;i++){h1^=s.charCodeAt(i);h1=Math.imul(h1,16777619);h2=Math.imul(h2^s.charCodeAt(i),2654435761);}return "f"+(h1>>>0).toString(16)+(h2>>>0).toString(16);}
+function hashPin(pin,salt){
+  var text=salt+":"+pin;
+  try{
+    if(window.crypto&&crypto.subtle&&window.TextEncoder){
+      return crypto.subtle.digest("SHA-256",new TextEncoder().encode(text)).then(function(buf){
+        return "s"+Array.prototype.map.call(new Uint8Array(buf),function(b){return b.toString(16).padStart(2,"0");}).join("");
+      }).catch(function(){return fallbackHash(text);});
+    }
+  }catch(e){}
+  return Promise.resolve(fallbackHash(text));
+}
+
+/* ---------- storage ---------- */
+var state=null, storageOK=true, loadProblem=false;
+function blank(){return {version:VERSION,family:"",pin:null,kids:[],tasks:[],rewards:[],ledger:[]};}
+function valid(d){
+  if(!d||typeof d!=="object"||d.version!==VERSION)return false;
+  if(!Array.isArray(d.kids)||!Array.isArray(d.tasks)||!Array.isArray(d.rewards)||!Array.isArray(d.ledger))return false;
+  var S=function(v){return typeof v==="string";},N=function(v){return typeof v==="number"&&isFinite(v);};
+  return d.kids.every(function(k){return k&&S(k.id)&&S(k.name)&&N(k.color);})&&
+    d.tasks.every(function(t){return t&&S(t.id)&&S(t.title)&&N(t.points)&&Array.isArray(t.kidIds);})&&
+    d.rewards.every(function(r){return r&&S(r.id)&&S(r.title)&&N(r.cost);})&&
+    d.ledger.every(function(e){return e&&S(e.id)&&S(e.kidId)&&S(e.date)&&N(e.ts)&&N(e.amount)&&S(e.note)&&TYPE_LABEL[e.type];});
+}
+function load(){
+  try{
+    var raw=localStorage.getItem(KEY);
+    if(raw===null){state=blank();return;}
+    var d=JSON.parse(raw);
+    if(valid(d)){state=d;}else{state=blank();loadProblem=true;}
+  }catch(e){
+    if(e instanceof SyntaxError){loadProblem=true;}else{storageOK=false;}
+    state=blank();
+  }
+}
+function save(){
+  if(loadProblem)return false;
+  try{localStorage.setItem(KEY,JSON.stringify(state));storageOK=true;return true;}
+  catch(e){storageOK=false;return false;}
+}
+function commit(mut,msg){mut(state);var ok=save();render();if(msg)toast(ok?msg:"Not saved in this browser");}
+window.addEventListener("storage",function(e){
+  if(e.key!==KEY||e.newValue===null)return;
+  try{var d=JSON.parse(e.newValue);if(valid(d)){state=d;render();}}catch(err){}
+});
+
+/* ---------- derived ---------- */
+function balance(id){return state.ledger.reduce(function(s,e){return e.kidId===id?s+e.amount:s;},0);}
+function tasksFor(id){return state.tasks.filter(function(t){return !t.kidIds.length||t.kidIds.indexOf(id)>=0;});}
+function doneToday(kidId,taskId){var t=dkey();return state.ledger.find(function(e){return e.kidId===kidId&&e.type==="task"&&e.taskId===taskId&&e.date===t;});}
+function kidById(id){return state.kids.find(function(k){return k.id===id;});}
+function addEntry(kidId,type,amount,note,taskId){state.ledger.push({id:uid(),kidId:kidId,date:dkey(),ts:Date.now(),amount:amount,type:type,note:note,taskId:taskId||undefined});}
+
+/* ---------- ui state ---------- */
+var ui={view:"kids",kidId:null,tab:"overview",unlocked:false,histKid:"all",showAll:false,pendingConfirm:null};
+var app=document.getElementById("app");
+var dlg=document.getElementById("dlg");
+
+function nav(){
+  var n=document.getElementById("nav");
+  document.getElementById("familyName").textContent=state.family?("· "+state.family):"";
+  if(!state.pin){n.innerHTML="";return;}
+  var h='<button class="btn '+(ui.view==="kids"?"":"outline")+' sm" data-action="go-kids" aria-current="'+(ui.view==="kids"?"page":"false")+'">Kids</button>';
+  h+='<button class="btn '+(ui.view==="parent"?"":"outline")+' sm" data-action="go-parent" aria-current="'+(ui.view==="parent"?"page":"false")+'">Parent panel</button>';
+  if(ui.unlocked)h+='<button class="btn ghost sm" data-action="lock">Lock</button>';
+  n.innerHTML=h;
+}
+
+function banner(){
+  if(loadProblem)return '<div class="alert" role="alert">Saved data in this browser couldn\'t be read, so it was left untouched. Changes you make now won\'t be saved. You can restore a backup from Parent panel → Settings.</div>';
+  if(!storageOK)return '<div class="alert" role="alert">This browser isn\'t letting the site save data. Your changes will be lost when you close the page.</div>';
+  return "";
+}
+
+function render(){
+  nav();
+  if(!state.pin){app.innerHTML=banner()+viewSetup();return;}
+  app.innerHTML=banner()+(ui.view==="parent"&&ui.unlocked?viewParent():viewKids());
+}
+
+/* ---------- setup ---------- */
+function viewSetup(){
+  return '<div class="hero card"><h1>Welcome!</h1><p class="muted">Set up your family. The parent PIN keeps the Parent panel for grown-ups.</p>'+
+  '<form class="stack" data-form="setup" novalidate>'+
+  '<label class="f">Family name<input type="text" name="family" maxlength="40" required autocomplete="off"></label>'+
+  '<label class="f">Parent PIN (4–8 digits)<input type="password" name="pin" inputmode="numeric" maxlength="8" autocomplete="new-password" required></label>'+
+  '<label class="f">Repeat PIN<input type="password" name="pin2" inputmode="numeric" maxlength="8" autocomplete="new-password" required></label>'+
+  '<label class="checks"><label><input type="checkbox" name="defaults" checked> Start with suggested tasks and rewards</label></label>'+
+  '<p class="err" id="setupErr" role="alert"></p>'+
+  '<button class="btn" type="submit">Create family</button></form></div>';
+}
+
+/* ---------- kids view ---------- */
+function rewardPath(kid,bal){
+  var rs=state.rewards.slice().sort(function(a,b){return a.cost-b.cost;});
+  var max=Math.max.apply(null,[bal,50].concat(rs.map(function(r){return r.cost;})));
+  var W=460,x0=24,x1=W-24,y=80;
+  function X(v){return x0+(x1-x0)*Math.max(0,v)/max;}
+  var bx=X(bal);
+  var desc=kid.name+" has "+bal+" points. "+(rs.length?rs.map(function(r){return r.title+": "+r.cost+" points, "+(bal>=r.cost?"reached":(r.cost-bal)+" to go");}).join("; "):"No rewards set.");
+  var s='<svg viewBox="0 0 '+W+' 160" width="100%" role="img" aria-labelledby="rpT rpD"><title id="rpT">'+esc(kid.name)+"'s reward path</title><desc id=\"rpD\">"+esc(desc)+'</desc>';
+  s+='<line x1="'+x0+'" y1="'+y+'" x2="'+x1+'" y2="'+y+'" stroke="var(--soft)" stroke-width="14" stroke-linecap="round"/>';
+  if(bal>0)s+='<line x1="'+x0+'" y1="'+y+'" x2="'+bx+'" y2="'+y+'" stroke="var(--primary)" stroke-width="14" stroke-linecap="round"/>';
+  rs.forEach(function(r,i){
+    var rx=X(r.cost),ok=bal>=r.cost,above=i%2===0;
+    var lbl=r.title.length>18?r.title.slice(0,17)+"\u2026":r.title;
+    var anchor=rx>W-70?"end":rx<70?"start":"middle";
+    s+='<circle cx="'+rx+'" cy="'+y+'" r="16" stroke-width="3" fill="'+(ok?"var(--gold-mark)":"var(--card)")+'" stroke="'+(ok?"var(--gold)":"var(--border)")+'"/>';
+    s+='<text x="'+rx+'" y="'+(y+4)+'" text-anchor="middle" font-size="12" font-weight="700" fill="'+(ok?"#3b2004":"var(--fg)")+'">'+r.cost+'</text>';
+    s+='<text x="'+rx+'" y="'+(above?y-26:y+38)+'" text-anchor="'+anchor+'" font-size="13" fill="var(--fg)">'+esc(lbl)+'</text>';
+  });
+  s+='<circle cx="'+bx+'" cy="'+y+'" r="9" fill="var(--primary)" stroke="var(--card)" stroke-width="3"/>';
+  s+='<text x="'+bx+'" y="154" text-anchor="'+(bx>W-60?"end":bx<60?"start":"middle")+'" font-size="14" font-weight="700" fill="var(--fg)">'+esc(kid.name)+': '+bal+'</text></svg>';
+  var next=rs.find(function(r){return r.cost>bal;});
+  var cap=next?'<strong>'+(next.cost-bal)+' points</strong> to '+esc(next.title):(rs.length?'<strong>Every reward reached!</strong>':'No rewards yet');
+  return '<figure>'+s+'<figcaption class="small">'+cap+'</figcaption></figure>';
+}
+
+function viewKids(){
+  if(!state.kids.length)return '<div class="card empty"><h1>No kids registered yet</h1><p>Open the Parent panel to register your children.</p><button class="btn" data-action="go-parent">Open Parent panel</button></div>';
+  var kid=kidById(ui.kidId)||state.kids[0];ui.kidId=kid.id;
+  var bal=balance(kid.id),list=tasksFor(kid.id),today=dkey();
+  var done=list.filter(function(t){return doneToday(kid.id,t.id);}).length;
+  var todayPts=state.ledger.filter(function(e){return e.kidId===kid.id&&e.date===today&&e.amount>0;}).reduce(function(s,e){return s+e.amount;},0);
+  var h='<div class="kidpick" role="group" aria-label="Choose child">';
+  state.kids.forEach(function(k){h+='<button class="kidbtn" data-action="pick-kid" data-id="'+k.id+'" aria-pressed="'+(k.id===kid.id)+'">'+avatar(k)+esc(k.name)+' <span class="muted">· '+balance(k.id)+'</span></button>';});
+  h+='</div>';
+  h+='<div class="score"><div class="row">'+avatar(kid,"lg")+'<div><h1>'+esc(kid.name)+'</h1><div><span class="big">'+bal+'</span> points</div></div></div>';
+  h+='<div style="flex:1;min-inline-size:220px;max-inline-size:380px"><div class="row" style="justify-content:space-between;margin-block-end:6px"><strong>Today</strong><span>'+done+'/'+list.length+' tasks · '+fmt(todayPts)+' pts</span></div>';
+  h+='<div class="bar" role="progressbar" aria-label="Today\'s tasks completed" aria-valuemin="0" aria-valuemax="'+list.length+'" aria-valuenow="'+done+'"><span style="inline-size:'+(list.length?done/list.length*100:0)+'%"></span></div></div></div>';
+  h+='<div class="grid2"><section class="card" aria-labelledby="tH"><h2 id="tH">Today\'s tasks</h2>';
+  if(!list.length)h+='<p class="muted">No tasks yet.</p>';
+  else{h+='<ul class="clean">';list.forEach(function(t){var d=!!doneToday(kid.id,t.id);
+    h+='<li><button class="task" data-action="toggle-task" data-id="'+t.id+'" aria-pressed="'+d+'"><span class="tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="t">'+esc(t.title)+'</span><span class="sr">'+(d?"done":"not done")+'</span><span class="pill">+'+t.points+'</span></button></li>';});
+  h+='</ul>';}
+  h+='</section><section class="card" aria-labelledby="rH"><h2 id="rH">Rewards</h2>'+rewardPath(kid,bal)+'<ul class="clean list" style="margin-block-start:12px">';
+  state.rewards.slice().sort(function(a,b){return a.cost-b.cost;}).forEach(function(r){var ok=bal>=r.cost;
+    h+='<li><div class="grow"><div class="trunc"><strong>'+esc(r.title)+'</strong></div><div class="small">'+r.cost+' pts '+(ok?'<span class="pill b-reward">Ready — ask a parent!</span>':'· '+(r.cost-bal)+' to go')+'</div></div></li>';});
+  h+='</ul></section></div>';
+  var hist=state.ledger.filter(function(e){return e.kidId===kid.id;}).sort(function(a,b){return b.ts-a.ts;}).slice(0,8);
+  h+='<section class="card" style="margin-block-start:20px" aria-labelledby="hH"><h2 id="hH">Recent points</h2>'+histList(hist,false)+'</section>';
+  return h;
+}
+
+function histList(items,canDelete,showKid){
+  if(!items.length)return '<p class="muted">No points yet.</p>';
+  var h='<ul class="clean list">';
+  items.forEach(function(e){var k=kidById(e.kidId);
+    h+='<li><span class="pill b-'+e.type+'" style="min-inline-size:5.6em;text-align:center">'+TYPE_LABEL[e.type]+'</span>'+(showKid&&k?avatar(k,"sm"):"")+'<div class="grow"><div class="trunc"><strong>'+esc(e.note)+'</strong></div><div class="small muted">'+(showKid&&k?esc(k.name)+" · ":"")+dayLabel(e.date)+'</div></div><span class="amt '+(e.amount<0?"neg":"pos")+'">'+fmt(e.amount)+'</span>'+
+    (canDelete?'<button class="btn ghost icon" data-action="del-entry" data-id="'+e.id+'" aria-label="Delete entry: '+esc(e.note)+'">'+trashIcon()+'</button>':"")+'</li>';});
+  return h+'</ul>';
+}
+function trashIcon(){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';}
+function editIcon(){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';}
+
+/* ---------- parent panel ---------- */
+var TABS=[["overview","Overview"],["kids","Kids"],["tasks","Tasks"],["rewards","Rewards"],["history","History"],["settings","Settings"]];
+function viewParent(){
+  var h='<h1 style="margin-block-end:14px">Parent panel</h1><div class="tabs" role="tablist" aria-label="Parent panel sections">';
+  TABS.forEach(function(t){h+='<button class="tab" role="tab" id="tab-'+t[0]+'" aria-controls="panel" aria-selected="'+(ui.tab===t[0])+'" data-action="tab" data-id="'+t[0]+'">'+t[1]+'</button>';});
+  h+='</div><div id="panel" role="tabpanel" aria-labelledby="tab-'+ui.tab+'">';
+  h+=({overview:pOverview,kids:pKids,tasks:pTasks,rewards:pRewards,history:pHistory,settings:pSettings})[ui.tab]();
+  return h+'</div>';
+}
+
+function weekBars(kidId){
+  var days=[],max=1;
+  for(var i=6;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);var k=dkey(d);
+    var v=state.ledger.filter(function(e){return e.kidId===kidId&&e.date===k&&e.amount>0;}).reduce(function(s,e){return s+e.amount;},0);
+    max=Math.max(max,v);days.push([d.toLocaleDateString(undefined,{weekday:"narrow"}),v,d.toLocaleDateString(undefined,{weekday:"long"})]);}
+  var h='<div class="small"><strong>Points earned, last 7 days</strong></div><div class="week" aria-hidden="true">';
+  days.forEach(function(d){h+='<div><b>'+d[1]+'</b><i style="block-size:'+(d[1]/max*48)+'px"></i></div>';});
+  h+='</div><div class="weeklbl" aria-hidden="true">';days.forEach(function(d){h+='<span>'+esc(d[0])+'</span>';});
+  h+='</div><ul class="sr">';days.forEach(function(d){h+='<li>'+esc(d[2])+': '+d[1]+' points</li>';});
+  return h+'</ul>';
+}
+
+function pOverview(){
+  if(!state.kids.length)return '<div class="card empty"><p>Register your children to get started.</p><button class="btn" data-action="kid-add">Register a child</button></div>';
+  var h='<div class="kidcards">';
+  state.kids.forEach(function(k){
+    var b=balance(k.id),list=tasksFor(k.id),done=list.filter(function(t){return doneToday(k.id,t.id);}).length;
+    h+='<section class="card" aria-label="'+esc(k.name)+'"><div class="row">'+avatar(k)+'<div class="grow"><h3>'+esc(k.name)+'</h3><div class="small">'+done+'/'+list.length+' tasks today</div></div><div class="big" style="font-size:1.7rem">'+b+'</div></div>';
+    h+=weekBars(k.id);
+    h+='<div class="quick">';QUICK.forEach(function(q){h+='<button class="btn outline sm" data-action="quick" data-id="'+k.id+'" data-amt="'+q[1]+'" data-note="'+esc(q[0])+'" style="justify-content:space-between"><span>'+q[0]+'</span><span class="pill '+(q[1]>0?"b-bonus":"b-deduction")+'">'+fmt(q[1])+'</span></button>';});
+    h+='</div><div class="row"><button class="btn sm" data-action="adjust" data-id="'+k.id+'">Add / deduct points…</button><button class="btn outline sm" data-action="redeem-pick" data-id="'+k.id+'">Redeem reward…</button></div></section>';
+  });
+  return h+'</div>';
+}
+
+function pKids(){
+  var h='<div class="card"><div class="row" style="justify-content:space-between;margin-block-end:8px"><h2 style="margin:0">Registered kids</h2><button class="btn sm" data-action="kid-add">Register a child</button></div>';
+  if(!state.kids.length)return h+'<p class="muted">No kids registered yet.</p></div>';
+  h+='<ul class="clean list">';
+  state.kids.forEach(function(k){h+='<li>'+avatar(k)+'<div class="grow"><strong>'+esc(k.name)+'</strong><div class="small muted">'+(k.age?esc(k.age)+" years · ":"")+balance(k.id)+' points</div></div><button class="btn ghost icon" data-action="kid-edit" data-id="'+k.id+'" aria-label="Edit '+esc(k.name)+'">'+editIcon()+'</button><button class="btn ghost icon" data-action="kid-del" data-id="'+k.id+'" aria-label="Remove '+esc(k.name)+'">'+trashIcon()+'</button></li>';});
+  return h+'</ul></div>';
+}
+
+function pTasks(){
+  var h='<div class="card"><div class="row" style="justify-content:space-between;margin-block-end:8px"><h2 style="margin:0">Daily tasks</h2><button class="btn sm" data-action="task-add">Add task</button></div>';
+  if(!state.tasks.length)return h+'<p class="muted">No tasks yet.</p></div>';
+  h+='<ul class="clean list">';
+  state.tasks.forEach(function(t){var who=t.kidIds.length?t.kidIds.map(function(id){var k=kidById(id);return k?k.name:null;}).filter(Boolean).join(", "):"All kids";
+    h+='<li><span class="pill">+'+t.points+'</span><div class="grow"><strong>'+esc(t.title)+'</strong><div class="small muted">'+esc(who||"All kids")+'</div></div><button class="btn ghost icon" data-action="task-edit" data-id="'+t.id+'" aria-label="Edit '+esc(t.title)+'">'+editIcon()+'</button><button class="btn ghost icon" data-action="task-del" data-id="'+t.id+'" aria-label="Delete '+esc(t.title)+'">'+trashIcon()+'</button></li>';});
+  return h+'</ul></div>';
+}
+
+function pRewards(){
+  var h='<div class="card"><div class="row" style="justify-content:space-between;margin-block-end:8px"><h2 style="margin:0">Rewards</h2><button class="btn sm" data-action="reward-add">Add reward</button></div>';
+  if(!state.rewards.length)return h+'<p class="muted">No rewards yet.</p></div>';
+  h+='<ul class="clean list">';
+  state.rewards.slice().sort(function(a,b){return a.cost-b.cost;}).forEach(function(r){
+    h+='<li><span class="pill b-reward">'+r.cost+' pts</span><div class="grow"><strong>'+esc(r.title)+'</strong></div><button class="btn ghost icon" data-action="reward-edit" data-id="'+r.id+'" aria-label="Edit '+esc(r.title)+'">'+editIcon()+'</button><button class="btn ghost icon" data-action="reward-del" data-id="'+r.id+'" aria-label="Delete '+esc(r.title)+'">'+trashIcon()+'</button></li>';});
+  return h+'</ul></div>';
+}
+
+function pHistory(){
+  var items=state.ledger.filter(function(e){return ui.histKid==="all"||e.kidId===ui.histKid;}).sort(function(a,b){return b.ts-a.ts;});
+  var shown=ui.showAll?items:items.slice(0,25);
+  var h='<div class="card"><div class="row" style="justify-content:space-between;margin-block-end:8px"><h2 style="margin:0">Points history</h2><label class="row small" style="font-weight:600">Child <select data-change="hist-kid" style="inline-size:auto"><option value="all">All kids</option>';
+  state.kids.forEach(function(k){h+='<option value="'+k.id+'"'+(ui.histKid===k.id?" selected":"")+'>'+esc(k.name)+'</option>';});
+  h+='</select></label></div><p class="small muted">'+items.length+' entries. Deleting an entry reverses its points.</p>'+histList(shown,true,true);
+  if(items.length>25)h+='<button class="btn ghost sm" data-action="hist-more" aria-expanded="'+ui.showAll+'">'+(ui.showAll?"Show fewer":"Show all "+items.length)+'</button>';
+  return h+'</div>';
+}
+
+function pSettings(){
+  return '<div class="kidcards">'+
+  '<section class="card"><h2>Family</h2><form class="stack" data-form="family"><label class="f">Family name<input type="text" name="family" maxlength="40" value="'+esc(state.family)+'" required></label><button class="btn" type="submit">Save</button></form></section>'+
+  '<section class="card"><h2>Change parent PIN</h2><form class="stack" data-form="pin" novalidate><label class="f">Current PIN<input type="password" name="cur" inputmode="numeric" maxlength="8" autocomplete="current-password"></label><label class="f">New PIN (4–8 digits)<input type="password" name="pin" inputmode="numeric" maxlength="8" autocomplete="new-password"></label><label class="f">Repeat new PIN<input type="password" name="pin2" inputmode="numeric" maxlength="8" autocomplete="new-password"></label><p class="err" id="pinErr" role="alert"></p><button class="btn" type="submit">Change PIN</button></form></section>'+
+  '<section class="card"><h2>Backup</h2><p class="small">Everything is stored in this browser. Download a backup to keep it safe or move it to another device.</p><div class="row"><button class="btn" data-action="export">Download backup</button><label class="btn outline" tabindex="0" data-action="import-trigger">Restore backup<input type="file" id="importFile" accept="application/json,.json" class="sr"></label></div></section>'+
+  '<section class="card"><h2>Start over</h2><p class="small">Deletes the family, kids, tasks, rewards and all points history from this browser.</p><button class="btn danger" data-action="reset">Delete all data</button></section>'+
+  '</div>';
+}
+
+/* ---------- dialogs ---------- */
+var dlgHandler=null;
+function openDialog(title,body,onSubmit,submitLabel,danger){
+  dlgHandler=onSubmit;
+  dlg.innerHTML='<form class="stack" data-form="dialog" novalidate><h2 id="dlgTitle" style="margin:0">'+esc(title)+'</h2>'+body+'<p class="err" id="dlgErr" role="alert"></p><div class="actions"><button type="button" class="btn outline" data-action="dlg-cancel">Cancel</button><button type="submit" class="btn'+(danger?" danger":"")+'">'+esc(submitLabel||"Save")+'</button></div></form>';
+  try{dlg.showModal();}catch(e){dlg.setAttribute("open","");}
+  var f=dlg.querySelector("input,select");if(f)f.focus();
+}
+function closeDialog(){dlgHandler=null;try{dlg.close();}catch(e){dlg.removeAttribute("open");}}
+function dlgErr(m){var e=document.getElementById("dlgErr");if(e)e.textContent=m;}
+function confirmBox(title,msg,label,fn){openDialog(title,'<p style="margin:0">'+esc(msg)+'</p>',function(){fn();return true;},label,true);}
+function intIn(v,lo,hi){var n=Number(v);return String(v).trim()!==""&&Number.isInteger(n)&&n>=lo&&n<=hi?n:null;}
+
+function kidForm(k){
+  var h='<label class="f">Child\'s name<input type="text" name="name" maxlength="30" value="'+(k?esc(k.name):"")+'" required></label>';
+  h+='<label class="f">Age (optional)<input type="number" name="age" min="1" max="18" value="'+(k&&k.age?esc(k.age):"")+'"></label>';
+  h+='<fieldset style="border:0;padding:0;margin:0"><legend class="f" style="font-weight:600;margin-block-end:6px">Colour</legend><div class="swatches">';
+  var cur=k?k.color:(state.kids.length%COLORS);
+  for(var i=0;i<COLORS;i++)h+='<label><input type="radio" name="color" value="'+i+'"'+(i===cur?" checked":"")+' aria-label="Colour '+(i+1)+'"><span class="avatar c'+i+'" aria-hidden="true">'+esc(initial(k?k.name:"A"))+'</span></label>';
+  return h+'</div></fieldset>';
+}
+function kidSubmit(k){return function(fd){
+  var name=String(fd.get("name")||"").trim();if(!name){dlgErr("Enter a name.");return false;}
+  var ageRaw=String(fd.get("age")||"").trim(),age=ageRaw?intIn(ageRaw,1,18):null;if(ageRaw&&age===null){dlgErr("Age must be a whole number from 1 to 18.");return false;}
+  var color=Number(fd.get("color")||0);
+  commit(function(s){if(k){var x=s.kids.find(function(z){return z.id===k.id;});if(x){x.name=name;x.age=age||undefined;x.color=color;}}else s.kids.push({id:uid(),name:name,age:age||undefined,color:color});},k?"Saved":name+" registered");
+  return true;};}
+
+function taskForm(t){
+  var h='<label class="f">Task<input type="text" name="title" maxlength="60" value="'+(t?esc(t.title):"")+'" required></label><label class="f">Points<input type="number" name="points" min="1" max="1000" value="'+(t?t.points:5)+'"></label>';
+  if(state.kids.length){h+='<fieldset style="border:0;padding:0;margin:0"><legend style="font-weight:600;margin-block-end:6px">Who does this task? <span class="small muted">(none ticked = all kids)</span></legend><div class="checks">';
+    state.kids.forEach(function(k){h+='<label><input type="checkbox" name="kid" value="'+k.id+'"'+(t&&t.kidIds.indexOf(k.id)>=0?" checked":"")+'> '+esc(k.name)+'</label>';});
+    h+='</div></fieldset>';}
+  return h;
+}
+function taskSubmit(t){return function(fd){
+  var title=String(fd.get("title")||"").trim(),pts=intIn(fd.get("points"),1,1000);
+  if(!title){dlgErr("Enter a task name.");return false;}if(pts===null){dlgErr("Points must be a whole number from 1 to 1,000.");return false;}
+  var ids=fd.getAll("kid").map(String);
+  commit(function(s){if(t){var x=s.tasks.find(function(z){return z.id===t.id;});if(x){x.title=title;x.points=pts;x.kidIds=ids;}}else s.tasks.push({id:uid(),title:title,points:pts,kidIds:ids});},t?"Task saved":"Task added");
+  return true;};}
+
+function rewardForm(r){return '<label class="f">Reward<input type="text" name="title" maxlength="60" value="'+(r?esc(r.title):"")+'" required></label><label class="f">Points needed<input type="number" name="cost" min="1" max="100000" value="'+(r?r.cost:50)+'"></label>';}
+function rewardSubmit(r){return function(fd){
+  var title=String(fd.get("title")||"").trim(),cost=intIn(fd.get("cost"),1,100000);
+  if(!title){dlgErr("Enter a reward name.");return false;}if(cost===null){dlgErr("Points must be a whole number from 1 to 100,000.");return false;}
+  commit(function(s){if(r){var x=s.rewards.find(function(z){return z.id===r.id;});if(x){x.title=title;x.cost=cost;}}else s.rewards.push({id:uid(),title:title,cost:cost});},r?"Reward saved":"Reward added");
+  return true;};}
+
+function adjustDialog(k){
+  openDialog("Adjust "+k.name+"'s points",
+    '<div class="seg" role="radiogroup" aria-label="Add or deduct"><label><input type="radio" name="type" value="bonus" checked> Add</label><label><input type="radio" name="type" value="deduction"> Deduct</label></div>'+
+    '<label class="f">Points<input type="number" name="amount" min="1" max="1000" value="5"></label><label class="f">Reason<input type="text" name="note" maxlength="80" placeholder="e.g. Helped his sister"></label>',
+    function(fd){var type=fd.get("type")==="deduction"?"deduction":"bonus",n=intIn(fd.get("amount"),1,1000);
+      if(n===null){dlgErr("Points must be a whole number from 1 to 1,000.");return false;}
+      var amt=type==="bonus"?n:-n,note=String(fd.get("note")||"").trim()||(type==="bonus"?"Bonus points":"Points deducted");
+      commit(function(){addEntry(k.id,type,amt,note);},fmt(amt)+" points for "+k.name);return true;},"Save");
+}
+function redeemDialog(k){
+  var bal=balance(k.id),rs=state.rewards.slice().sort(function(a,b){return a.cost-b.cost;});
+  if(!rs.length){toast("Add a reward first");return;}
+  var h='<p style="margin:0">'+esc(k.name)+' has <strong>'+bal+'</strong> points.</p><fieldset style="border:0;padding:0;margin:0"><legend class="sr">Reward</legend><div class="stack" style="gap:6px">';
+  rs.forEach(function(r,i){var ok=bal>=r.cost;h+='<label class="row"><input type="radio" name="reward" value="'+r.id+'"'+(ok?"":" disabled")+(ok&&!rs.slice(0,i).some(function(z){return bal>=z.cost;})?" checked":"")+'> <span class="grow">'+esc(r.title)+'</span><span class="pill b-reward">'+r.cost+'</span>'+(ok?"":'<span class="small muted">'+(r.cost-bal)+' to go</span>')+'</label>';});
+  h+='</div></fieldset>';
+  openDialog("Redeem a reward",h,function(fd){var id=fd.get("reward"),r=state.rewards.find(function(z){return z.id===id;});
+    if(!r){dlgErr("Pick a reward "+k.name+" has enough points for.");return false;}
+    if(balance(k.id)<r.cost){dlgErr("Not enough points.");return false;}
+    commit(function(){addEntry(k.id,"reward",-r.cost,r.title);},k.name+" redeemed "+r.title);return true;},"Redeem");
+}
+function pinDialog(){
+  openDialog("Parent PIN",'<label class="f">Enter PIN<input type="password" name="pin" inputmode="numeric" maxlength="8" autocomplete="current-password"></label>',
+    function(fd){var pin=String(fd.get("pin")||"");
+      hashPin(pin,state.pin.salt).then(function(h){
+        if(h===state.pin.hash){closeDialog();ui.unlocked=true;ui.view="parent";render();app.focus();}
+        else dlgErr("That PIN isn't right.");});
+      return false;},"Unlock");
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click",function(ev){
+  var el=ev.target.closest("[data-action]");if(!el)return;
+  var a=el.getAttribute("data-action"),id=el.getAttribute("data-id");
+  var k=id?kidById(id):null;
+  switch(a){
+    case "go-kids":ui.view="kids";render();break;
+    case "go-parent":if(ui.unlocked){ui.view="parent";render();}else pinDialog();break;
+    case "lock":ui.unlocked=false;ui.view="kids";render();toast("Parent panel locked");break;
+    case "pick-kid":ui.kidId=id;render();break;
+    case "toggle-task":{var kid=kidById(ui.kidId);var t=state.tasks.find(function(z){return z.id===id;});if(!kid||!t)break;
+      var ex=doneToday(kid.id,t.id);
+      if(ex)commit(function(s){s.ledger=s.ledger.filter(function(e){return e.id!==ex.id;});});
+      else commit(function(){addEntry(kid.id,"task",t.points,t.title,t.id);},"+"+t.points+" points for "+kid.name+"!");
+      var b=app.querySelector('[data-action="toggle-task"][data-id="'+id+'"]');if(b)b.focus();break;}
+    case "tab":ui.tab=id;ui.showAll=false;render();var tb=document.getElementById("tab-"+id);if(tb)tb.focus();break;
+    case "quick":if(k){var amt=Number(el.getAttribute("data-amt")),note=el.getAttribute("data-note");commit(function(){addEntry(k.id,amt>0?"bonus":"deduction",amt,note);},fmt(amt)+" points for "+k.name);}break;
+    case "adjust":if(k)adjustDialog(k);break;
+    case "redeem-pick":if(k)redeemDialog(k);break;
+    case "kid-add":openDialog("Register a child",kidForm(null),kidSubmit(null));break;
+    case "kid-edit":if(k)openDialog("Edit child",kidForm(k),kidSubmit(k));break;
+    case "kid-del":if(k)confirmBox("Remove "+k.name+"?",k.name+" and all of their points history will be removed.","Remove",function(){commit(function(s){s.kids=s.kids.filter(function(z){return z.id!==k.id;});s.ledger=s.ledger.filter(function(e){return e.kidId!==k.id;});s.tasks.forEach(function(t){t.kidIds=t.kidIds.filter(function(x){return x!==k.id;});});},k.name+" removed");});break;
+    case "task-add":openDialog("Add task",taskForm(null),taskSubmit(null));break;
+    case "task-edit":{var t2=state.tasks.find(function(z){return z.id===id;});if(t2)openDialog("Edit task",taskForm(t2),taskSubmit(t2));break;}
+    case "task-del":{var t3=state.tasks.find(function(z){return z.id===id;});if(t3)confirmBox("Delete "+t3.title+"?","Points already earned for this task stay in the history.","Delete",function(){commit(function(s){s.tasks=s.tasks.filter(function(z){return z.id!==t3.id;});},"Task deleted");});break;}
+    case "reward-add":openDialog("Add reward",rewardForm(null),rewardSubmit(null));break;
+    case "reward-edit":{var r=state.rewards.find(function(z){return z.id===id;});if(r)openDialog("Edit reward",rewardForm(r),rewardSubmit(r));break;}
+    case "reward-del":{var r2=state.rewards.find(function(z){return z.id===id;});if(r2)confirmBox("Delete "+r2.title+"?","This removes the reward. Past redemptions stay in the history.","Delete",function(){commit(function(s){s.rewards=s.rewards.filter(function(z){return z.id!==r2.id;});},"Reward deleted");});break;}
+    case "del-entry":{var e=state.ledger.find(function(z){return z.id===id;});if(e){var kk=kidById(e.kidId);confirmBox("Delete this entry?",fmt(e.amount)+" points ("+e.note+") will be reversed"+(kk?" for "+kk.name:"")+".","Delete",function(){commit(function(s){s.ledger=s.ledger.filter(function(z){return z.id!==e.id;});},"Entry deleted");});}break;}
+    case "hist-more":ui.showAll=!ui.showAll;render();break;
+    case "dlg-cancel":closeDialog();break;
+    case "export":{try{var blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});var url=URL.createObjectURL(blob);var link=document.createElement("a");link.href=url;link.download="kids-chore-points-backup-"+dkey()+".json";document.body.appendChild(link);link.click();link.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);toast("Backup downloaded");}catch(err){toast("Download isn't available here");}break;}
+    case "import-trigger":if(ev.target===el){document.getElementById("importFile").click();ev.preventDefault();}break;
+    case "reset":confirmBox("Delete all data?","Everything for "+(state.family||"this family")+" will be removed from this browser. Download a backup first if you may need it.","Delete everything",function(){loadProblem=false;state=blank();ui={view:"kids",kidId:null,tab:"overview",unlocked:false,histKid:"all",showAll:false};try{localStorage.removeItem(KEY);}catch(err){}render();toast("All data deleted");});break;
+  }
+});
+document.addEventListener("keydown",function(ev){
+  var el=ev.target;
+  if(el.matches&&el.matches('[data-action="import-trigger"]')&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();document.getElementById("importFile").click();}
+  if(el.matches&&el.matches('[role="tab"]')&&(ev.key==="ArrowRight"||ev.key==="ArrowLeft")){
+    var i=TABS.findIndex(function(t){return t[0]===ui.tab;});i=(i+(ev.key==="ArrowRight"?1:TABS.length-1))%TABS.length;ui.tab=TABS[i][0];render();document.getElementById("tab-"+ui.tab).focus();}
+});
+document.addEventListener("change",function(ev){
+  var el=ev.target;
+  if(el.getAttribute("data-change")==="hist-kid"){ui.histKid=el.value;ui.showAll=false;render();var s=app.querySelector('[data-change="hist-kid"]');if(s)s.focus();}
+  if(el.id==="importFile"&&el.files&&el.files[0]){
+    var rd=new FileReader();
+    rd.onload=function(){try{var d=JSON.parse(String(rd.result));if(!valid(d)||!d.pin)throw new Error("bad");
+      confirmBox("Restore this backup?","This replaces everything in this browser with the backup for "+(d.family||"your family")+".","Restore",function(){loadProblem=false;state=d;ui.unlocked=false;ui.view="kids";ui.kidId=null;var ok=save();render();toast(ok?"Backup restored":"Restored, but not saved in this browser");});
+    }catch(err){toast("That file isn't a valid backup");}};
+    rd.readAsText(el.files[0]);el.value="";
+  }
+});
+document.addEventListener("submit",function(ev){
+  var f=ev.target,kind=f.getAttribute("data-form");if(!kind)return;ev.preventDefault();
+  var fd=new FormData(f);
+  if(kind==="dialog"){if(dlgHandler&&dlgHandler(fd))closeDialog();return;}
+  if(kind==="setup"){
+    var fam=String(fd.get("family")||"").trim(),p=String(fd.get("pin")||""),p2=String(fd.get("pin2")||""),err=document.getElementById("setupErr");
+    if(!fam){err.textContent="Enter a family name.";return;}
+    if(!/^\d{4,8}$/.test(p)){err.textContent="The PIN must be 4 to 8 digits.";return;}
+    if(p!==p2){err.textContent="The two PINs don't match.";return;}
+    var salt=uid();
+    hashPin(p,salt).then(function(h){
+      state.family=fam;state.pin={salt:salt,hash:h};
+      if(fd.get("defaults")){state.tasks=DEFAULT_TASKS.map(function(t){return {id:uid(),title:t[0],points:t[1],kidIds:[]};});state.rewards=DEFAULT_REWARDS.map(function(r){return {id:uid(),title:r[0],cost:r[1]};});}
+      save();ui.unlocked=true;ui.view="parent";ui.tab="kids";render();
+      openDialog("Register a child",kidForm(null),kidSubmit(null));
+    });
+    return;
+  }
+  if(kind==="family"){var fn=String(fd.get("family")||"").trim();if(fn)commit(function(s){s.family=fn;},"Saved");return;}
+  if(kind==="pin"){
+    var pe=document.getElementById("pinErr"),cur=String(fd.get("cur")||""),np=String(fd.get("pin")||""),np2=String(fd.get("pin2")||"");
+    hashPin(cur,state.pin.salt).then(function(h){
+      if(h!==state.pin.hash){pe.textContent="The current PIN isn't right.";return;}
+      if(!/^\d{4,8}$/.test(np)){pe.textContent="The new PIN must be 4 to 8 digits.";return;}
+      if(np!==np2){pe.textContent="The new PINs don't match.";return;}
+      var salt2=uid();hashPin(np,salt2).then(function(h2){commit(function(s){s.pin={salt:salt2,hash:h2};},"PIN changed");});
+    });
+  }
+});
+dlg.addEventListener("close",function(){dlgHandler=null;});
+
+load();
+render();
+})();
+</script>
+</body>
+</html>
