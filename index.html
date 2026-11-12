@@ -172,6 +172,25 @@ button.cell:hover{border-color:var(--primary)}
 .track .tn{overflow-wrap:anywhere}
 @media (max-width:560px){table.track{min-inline-size:0;border-spacing:3px;table-layout:fixed;inline-size:100%}.track thead th.tname{inline-size:34%}.track .tname{min-inline-size:0;inline-size:30%;max-inline-size:none}.track tbody th.tname{font-size:.8rem}.track th{font-size:.7rem}.track thead th b{font-size:.9rem}.cell{inline-size:30px;block-size:30px;border-radius:8px}.cell svg{inline-size:16px;block-size:16px}}
 .task[aria-busy="true"]{opacity:.7;cursor:progress}
+.taskrow{display:flex;gap:8px;align-items:stretch}
+.taskrow .task{flex:1;min-inline-size:0}
+.camb{margin-block-end:8px;min-inline-size:54px;background:var(--card);color:var(--fg);border-color:var(--border);border-radius:12px}
+.camb:hover{background:var(--soft);filter:none}
+.camb.need{background:var(--primary);color:var(--primary-fg);border-color:var(--primary)}
+.camb.has{background:var(--ok-soft);color:var(--ok-fg);border-color:var(--ok)}
+.needp{display:block;font-weight:400}
+label.btn:focus-within{outline:3px solid var(--primary);outline-offset:2px}
+.cell{position:relative}
+.phdot{position:absolute;inset-block-start:-7px;inset-inline-end:-7px;inline-size:18px;block-size:18px;border-radius:50%;background:var(--primary);display:grid;place-items:center;border:2px solid var(--card)}
+.cell .phdot svg{display:block;inline-size:11px;block-size:11px;stroke:var(--primary-fg);stroke-width:2.5}
+.phgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px}
+.phbtn{display:grid;place-items:center;aspect-ratio:1;inline-size:100%;padding:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--soft);color:var(--muted);cursor:pointer}
+.phbtn img{inline-size:100%;block-size:100%;object-fit:cover;display:block}
+.phph svg{inline-size:34px;block-size:34px}
+.phbig{display:grid;place-items:center;min-block-size:120px}
+.phbig img,.phprev{max-inline-size:100%;max-block-size:58vh;border-radius:12px;display:block;margin-inline:auto}
+.phprev{max-block-size:40vh}
+@media (forced-colors: active){.phdot{border:1px solid CanvasText}}
 @media (forced-colors: active){.cell{border:1px solid ButtonText}.cell[aria-pressed="true"],.cell.ro[data-done="true"]{background:Highlight}}
 </style>
 </head>
@@ -194,7 +213,7 @@ button.cell:hover{border-color:var(--primary)}
    window.KCP_SHEETS_URL = "https://script.google.com/macros/s/XXXX/exec";
    Leave it empty ("") to run in demo mode (everything stays in this browser).
    ===================================================================== */
-window.KCP_SHEETS_URL = "https://script.google.com/macros/s/AKfycbxd4-WAKdlO1jhD2CTm4ydfEPqEwqSgUQ6fU0XrpfNPJOTVHw72LIbFp8j5t0VWSx_T/exec";
+window.KCP_SHEETS_URL = "";
 </script>
 <script>
 (function(){
@@ -206,9 +225,9 @@ var KCP = (function () {
     Families: ["code", "name", "createdAt"],
     Parents: ["id", "familyCode", "name", "email", "salt", "hash", "createdAt"],
     Kids: ["id", "familyCode", "name", "age", "color", "username", "salt", "hash", "createdAt"],
-    Tasks: ["id", "familyCode", "title", "points", "kidIds", "schedule", "createdAt"],
+    Tasks: ["id", "familyCode", "title", "points", "kidIds", "schedule", "createdAt", "photo"],
     Rewards: ["id", "familyCode", "title", "cost", "createdAt"],
-    Ledger: ["id", "familyCode", "kidId", "date", "ts", "amount", "type", "note", "taskId", "by"],
+    Ledger: ["id", "familyCode", "kidId", "date", "ts", "amount", "type", "note", "taskId", "by", "photo"],
     Sessions: ["token", "kind", "userId", "familyCode", "createdAt"]
   };
   var NUMERIC = { createdAt: 1, age: 1, color: 1, points: 1, cost: 1, ts: 1, amount: 1 };
@@ -303,7 +322,7 @@ var KCP = (function () {
 
   /* ---------- snapshot sent to the website ---------- */
   /* a task counts from the day before it was created (one day of slack for time zones) */
-  function taskView(t) { return { id: t.id, title: t.title, points: t.points, kidIds: t.kidIds ? t.kidIds.split(",") : [], schedule: t.schedule || "daily", start: t.createdAt ? addDays(fmtDate(t.createdAt), -1) : "" }; }
+  function taskView(t) { return { id: t.id, title: t.title, points: t.points, kidIds: t.kidIds ? t.kidIds.split(",") : [], schedule: t.schedule || "daily", photo: t.photo === "required" ? "required" : "", start: t.createdAt ? addDays(fmtDate(t.createdAt), -1) : "" }; }
   function sessionInfo(db, s) {
     if (s.kind === "parent") { var p = find(db.Parents, s.userId); return { kind: "parent", id: p.id, name: p.name, email: p.email, familyCode: s.familyCode }; }
     var k = find(db.Kids, s.userId); return { kind: "kid", id: k.id, name: k.name, familyCode: s.familyCode };
@@ -322,7 +341,7 @@ var KCP = (function () {
     all.sort(function (a, b) { return b.ts - a.ts; });
     var sinceD = /^\d{4}-\d{2}-\d{2}$/.test(String(since || "")) ? since : "0000-00-00";
     var ledger = all.filter(function (e, i) { return i < 300 || e.date >= sinceD; }).map(function (e) {
-      var o = { id: e.id, kidId: e.kidId, date: e.date, ts: e.ts, amount: e.amount, type: e.type, note: e.note }; if (e.taskId) o.taskId = e.taskId; return o; });
+      var o = { id: e.id, kidId: e.kidId, date: e.date, ts: e.ts, amount: e.amount, type: e.type, note: e.note }; if (e.taskId) o.taskId = e.taskId; if (e.photo) o.photo = 1; return o; });
     if (isKid) { var t = {}; t[s.userId] = totals[s.userId] || 0; totals = t; }
     return {
       session: sessionInfo(db, s),
@@ -358,6 +377,15 @@ var KCP = (function () {
       dropSessions(kid.id);
     }
     function dropSessions(userId) { var n = db.Sessions.length; db.Sessions = db.Sessions.filter(function (x) { return x.userId !== userId; }); if (db.Sessions.length !== n) dirty(db, "Sessions"); }
+    function photoIn(v) {
+      v = String(v || "");
+      if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(v)) throw E("bad-input", "That photo couldn't be read. Try taking it again.");
+      if (v.length > 3000000) throw E("bad-input", "That photo is too big.");
+      if (!env.savePhoto) throw E("bad-input", "Photos aren't available here.");
+      return v;
+    }
+    function storePhoto(v, kid, title, date) { return String(env.savePhoto(v, (date + " " + kid.name + " - " + title).replace(/[\\\/:*?"<>|]/g, "").slice(0, 90))); }
+    function dropPhoto(ref) { if (ref && env.deletePhoto) { try { env.deletePhoto(ref); } catch (x) { } } }
     function balance(fc, kidId) { var b = 0; db.Ledger.forEach(function (e) { if (e.familyCode === fc && e.kidId === kidId) b += e.amount; }); return b; }
 
     /* public actions */
@@ -427,7 +455,7 @@ var KCP = (function () {
       case "deleteKid": {
         parentOnly(); var k2 = kidOf(args.kidId);
         db.Kids = db.Kids.filter(function (k) { return k.id !== k2.id; }); dirty(db, "Kids"); dropSessions(k2.id);
-        db.Ledger = db.Ledger.filter(function (e) { return !(e.familyCode === fc && e.kidId === k2.id); }); dirty(db, "Ledger");
+        db.Ledger = db.Ledger.filter(function (e) { if (e.familyCode === fc && e.kidId === k2.id) { dropPhoto(e.photo); return false; } return true; }); dirty(db, "Ledger");
         var before = db.Tasks.length;
         db.Tasks = db.Tasks.filter(function (t) {
           if (t.familyCode !== fc || !t.kidIds) return true;
@@ -440,10 +468,10 @@ var KCP = (function () {
       }
       case "saveTask": {
         parentOnly(); var tin = args.task || {};
-        var title = str(tin.title, 60, "a task name"), pts = int(tin.points, 1, 1000, "Points"), sched = normSchedule(tin.schedule);
+        var title = str(tin.title, 60, "a task name"), pts = int(tin.points, 1, 1000, "Points"), sched = normSchedule(tin.schedule), tphoto = tin.photo === "required" ? "required" : "";
         var kidIds = (tin.kidIds || []).map(String).filter(function (x) { var k = find(db.Kids, x); return k && k.familyCode === fc; }).join(",");
-        if (tin.id) { var t0 = find(db.Tasks, tin.id); if (!t0 || t0.familyCode !== fc) throw E("not-found"); t0.title = title; t0.points = pts; t0.schedule = sched; t0.kidIds = kidIds; }
-        else db.Tasks.push({ id: id("t"), familyCode: fc, title: title, points: pts, kidIds: kidIds, schedule: sched, createdAt: now });
+        if (tin.id) { var t0 = find(db.Tasks, tin.id); if (!t0 || t0.familyCode !== fc) throw E("not-found"); t0.title = title; t0.points = pts; t0.schedule = sched; t0.kidIds = kidIds; t0.photo = tphoto; }
+        else db.Tasks.push({ id: id("t"), familyCode: fc, title: title, points: pts, kidIds: kidIds, schedule: sched, createdAt: now, photo: tphoto });
         dirty(db, "Tasks"); return result(s);
       }
       case "deleteTask": parentOnly(); db.Tasks = db.Tasks.filter(function (t) { return !(t.familyCode === fc && t.id === args.id); }); dirty(db, "Tasks"); return result(s);
@@ -456,7 +484,7 @@ var KCP = (function () {
       }
       case "deleteReward": parentOnly(); db.Rewards = db.Rewards.filter(function (r) { return !(r.familyCode === fc && r.id === args.id); }); dirty(db, "Rewards"); return result(s);
       case "addEntry": {
-        var en = args.entry || {}, kidId = String(en.kidId || ""), kidE = kidOf(kidId), type = String(en.type || ""), date = String(en.date || today), amount, note, taskId = "";
+        var en = args.entry || {}, kidId = String(en.kidId || ""), kidE = kidOf(kidId), type = String(en.type || ""), date = String(en.date || today), amount, note, taskId = "", photo = "";
         if (parseDate(date) === null) throw E("bad-input", "Bad date");
         if (date > addDays(today, 1)) throw E("bad-input", "That day hasn't happened yet.");
         if (!isParent) { if (kidId !== user.id || type !== "task") throw E("forbidden"); if (date < addDays(today, -2)) throw E("too-old"); }
@@ -465,6 +493,8 @@ var KCP = (function () {
           if (!task || task.familyCode !== fc) throw E("not-found");
           if (!appliesOn(taskObj(task), kidId, date)) throw E("not-scheduled");
           if (db.Ledger.some(function (e) { return e.familyCode === fc && e.kidId === kidId && e.type === "task" && e.taskId === task.id && e.date === date; })) throw E("already-done");
+          if (en.photo) photo = photoIn(en.photo);
+          else if (!isParent && task.photo === "required") throw E("photo-needed");
           amount = task.points; note = task.title; taskId = task.id;
         } else if (type === "bonus" || type === "deduction") {
           var n = int(Math.abs(Number(en.amount)), 1, 1000, "Points"); amount = type === "bonus" ? n : -n;
@@ -473,7 +503,8 @@ var KCP = (function () {
           var rw = find(db.Rewards, String(en.rewardId || "")); if (!rw || rw.familyCode !== fc) throw E("not-found");
           if (balance(fc, kidId) < rw.cost) throw E("not-enough"); amount = -rw.cost; note = rw.title;
         } else throw E("bad-input", "Unknown entry type");
-        var row = { id: id("e"), familyCode: fc, kidId: kidE.id, date: date, ts: now, amount: amount, type: type, note: note, taskId: taskId, by: s.kind + ":" + user.name };
+        var row = { id: id("e"), familyCode: fc, kidId: kidE.id, date: date, ts: now, amount: amount, type: type, note: note, taskId: taskId, by: s.kind + ":" + user.name, photo: "" };
+        if (photo) row.photo = storePhoto(photo, kidE, note, date);
         db.Ledger.push(row); db._ledgerAdd.push(row);
         return result(s);
       }
@@ -481,8 +512,24 @@ var KCP = (function () {
         var ent = find(db.Ledger, String(args.id || ""));
         if (!ent || ent.familyCode !== fc) throw E("not-found");
         if (!isParent && (ent.kidId !== user.id || ent.type !== "task" || ent.date < addDays(today, -2))) throw E("forbidden");
-        db.Ledger = db.Ledger.filter(function (e) { return e !== ent; }); db._ledgerDel.push(ent.id);
+        db.Ledger = db.Ledger.filter(function (e) { return e !== ent; }); db._ledgerDel.push(ent.id); dropPhoto(ent.photo);
         return result(s);
+      }
+      case "addPhoto": {
+        var pe0 = find(db.Ledger, String(args.id || ""));
+        if (!pe0 || pe0.familyCode !== fc || pe0.type !== "task") throw E("not-found");
+        if (!isParent && (pe0.kidId !== user.id || pe0.date < addDays(today, -2))) throw E("forbidden");
+        var pdata = photoIn(args.photo), old = pe0.photo;
+        pe0.photo = storePhoto(pdata, kidOf(pe0.kidId), pe0.note, pe0.date); dirty(db, "Ledger"); dropPhoto(old);
+        return result(s);
+      }
+      case "getPhoto": {
+        var ge = find(db.Ledger, String(args.id || ""));
+        if (!ge || ge.familyCode !== fc || !ge.photo) throw E("not-found");
+        if (!isParent && ge.kidId !== user.id) throw E("forbidden");
+        var img = env.getPhoto ? env.getPhoto(ge.photo) : null;
+        if (!img) throw E("not-found");
+        return { photo: img };
       }
       case "addParent": {
         parentOnly(); var pn = str(args.name, 40, "a name"), pe = email(args.email), pp = pw(args.password, 6);
@@ -530,9 +577,14 @@ var backend=MODE==="sheets"?{
     var db=KCP.newDb();if(raw&&typeof raw==="object")Object.keys(KCP.SCHEMA).forEach(function(t){if(Array.isArray(raw[t]))db[t]=raw[t].map(function(o){return KCP.norm(t,o);});});return db;}
   function save(db){var o={};Object.keys(KCP.SCHEMA).forEach(function(t){o[t]=db[t];});try{localStorage.setItem(KEY,JSON.stringify(o));}catch(e){throw err("storage");}}
   window.addEventListener("storage",function(e){if(e.key===KEY&&token)refresh();});
+  var PKEY=KEY+":photo:";
+  var demoEnv={now:function(){return Date.now();},rand:randHex,
+    savePhoto:function(d){var ref="demo"+randHex(12);try{localStorage.setItem(PKEY+ref,d);}catch(e){throw err("bad-input","This browser is out of space for photos. In demo mode photos are kept in the browser; connect your Google Sheet to store them in Google Drive.");}return ref;},
+    getPhoto:function(ref){try{return localStorage.getItem(PKEY+ref);}catch(e){return null;}},
+    deletePhoto:function(ref){try{localStorage.removeItem(PKEY+ref);}catch(e){}}};
   return {call:function(action,args,token){
     return new Promise(function(resolve,reject){setTimeout(function(){
-      try{var db=KCP.track(load());var data=KCP.run(db,{now:function(){return Date.now();},rand:randHex},action,args,token);
+      try{var db=KCP.track(load());var data=KCP.run(db,demoEnv,action,args,token);
         if(Object.keys(db._dirty).length||db._ledgerAdd.length||db._ledgerDel.length)save(db);resolve(data);}catch(e){reject(e);}},0);});
   }};
 })();
@@ -540,7 +592,7 @@ var backend=MODE==="sheets"?{
 /* ---------- state ---------- */
 var token=null;try{token=localStorage.getItem(TOKEN_KEY);}catch(e){}
 var data=null,booting=!!token,bootErr=null;
-var ui={tab:"overview",histKid:"all",showAll:false,optimistic:{},trackKid:null,trackOffset:0,kidOffset:0};
+var ui={photos:{},tab:"overview",histKid:"all",showAll:false,optimistic:{},trackKid:null,trackOffset:0,kidOffset:0};
 var app=document.getElementById("app"),dlg=document.getElementById("dlg");
 function session(){return data?data.session:null;}
 function fam(){return data;}
@@ -575,6 +627,7 @@ function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.c
 function trashIcon(){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';}
 function editIcon(){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';}
 function keyIcon(){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></svg>';}
+function camIcon(){return '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';}
 function tickSvg(){return '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';}
 function intIn(v,lo,hi){var n=Number(v);return String(v).trim()!==""&&Number.isInteger(n)&&n>=lo&&n<=hi?n:null;}
 function friendly(e){
@@ -591,7 +644,8 @@ function friendly(e){
     "already-done":"That task is already ticked for that day.",
     "not-scheduled":"That task isn't scheduled for that day.",
     "too-old":"Kids can only tick tasks for today and yesterday. Ask a parent for older days.",
-    "not-enough":"Not enough points for that reward."};
+    "not-enough":"Not enough points for that reward.",
+    "photo-needed":"This task needs a photo. Tap the camera and take one."};
   if(c==="bad-input"&&e.message&&e.message!=="bad-input")return e.message;
   return m[c]||"Something went wrong. Please try again.";
 }
@@ -696,8 +750,9 @@ function trackerGrid(kid,dates,editable){
       if(!KCP.appliesOn(t,kid.id,d)){h+='<td><span class="cell off" aria-label="Not scheduled">\u2013</span></td>';return;}
       var done=isDone(kid.id,t.id,d),can=editable(d)&&!(okey(kid.id,t.id,d) in ui.optimistic);
       var lab=esc(t.title)+', '+esc(longDay(d))+': '+(done?"done":"not done");
-      if(editable(d))h+='<td><button class="cell" data-action="toggle" data-kid="'+kid.id+'" data-task="'+t.id+'" data-date="'+d+'" aria-pressed="'+done+'" aria-label="'+lab+'"'+(can?"":" disabled")+'>'+tickSvg()+'</button></td>';
-      else h+='<td><span class="cell ro" data-done="'+done+'" role="img" aria-label="'+lab+'">'+(done?tickSvg():"")+'</span></td>';
+      var ent=done?entryFor(kid.id,t.id,d):null,ph=ent&&ent.photo,badge=ph?'<span class="phdot" aria-hidden="true">'+camIcon()+'</span>':"";if(ph)lab+=", with photo";
+      if(editable(d))h+='<td><button class="cell" data-action="toggle" data-kid="'+kid.id+'" data-task="'+t.id+'" data-date="'+d+'" aria-pressed="'+done+'" aria-label="'+lab+'"'+(can?"":" disabled")+'>'+tickSvg()+badge+'</button></td>';
+      else h+='<td><span class="cell ro" data-done="'+done+'" role="img" aria-label="'+lab+'">'+(done?tickSvg():"")+badge+'</span></td>';
     });
     h+='</tr>';
   });
@@ -755,7 +810,11 @@ function vMe(){
   h+='<div class="grid2"><section class="card" aria-labelledby="tH"><h2 id="tH">Today\'s tasks <span class="small muted">\u00b7 '+esc(longDay(today))+'</span></h2>';
   if(!list.length)h+='<p class="muted">No tasks today. Enjoy your day!</p>';
   else{h+='<ul class="clean">';list.forEach(function(t){var d=isDone(kid.id,t.id,today),busy=okey(kid.id,t.id,today) in ui.optimistic;
-    h+='<li><button class="task" data-action="toggle" data-kid="'+kid.id+'" data-task="'+t.id+'" data-date="'+today+'" aria-pressed="'+d+'"'+(busy?' aria-busy="true"':'')+'><span class="tick" aria-hidden="true">'+tickSvg()+'</span><span class="t">'+esc(t.title)+'</span><span class="sr">'+(d?"done":"not done")+'</span><span class="pill">+'+t.points+'</span></button></li>';});h+='</ul>';}
+    var en=entryFor(kid.id,t.id,today),hasP=!!(en&&en.photo),need=t.photo==="required";
+    var camLab=hasP?"See my photo for "+t.title:en?"Add a photo for "+t.title:"Take a photo and finish "+t.title;
+    h+='<li class="taskrow"><button class="task" data-action="toggle" data-kid="'+kid.id+'" data-task="'+t.id+'" data-date="'+today+'" aria-pressed="'+d+'"'+(busy?' aria-busy="true"':'')+'><span class="tick" aria-hidden="true">'+tickSvg()+'</span><span class="t">'+esc(t.title)+(need&&!d?'<span class="small muted needp">\ud83d\udcf7 Photo needed</span>':'')+'</span><span class="sr">'+(d?"done":"not done")+'</span><span class="pill">+'+t.points+'</span></button>'+
+      '<button class="btn camb'+(hasP?" has":"")+(need&&!d?" need":"")+'" data-action="kid-photo" data-task="'+t.id+'" data-date="'+today+'" aria-label="'+esc(camLab)+'"'+(busy?" disabled":"")+'>'+camIcon()+'</button></li>';});h+='</ul>';
+    h+='<p class="small muted" style="margin:0">Tap the camera to show your parents a photo of what you did.</p>';}
   h+='</section><section class="card" aria-labelledby="rH"><h2 id="rH">Rewards</h2>'+rewardPath(kid,bal)+'<ul class="clean list" style="margin-block-start:12px">';
   data.rewards.slice().sort(function(a,b){return a.cost-b.cost;}).forEach(function(r){var ok=bal>=r.cost;
     h+='<li><div class="grow"><div class="trunc"><strong>'+esc(r.title)+'</strong></div><div class="small">'+r.cost+' pts '+(ok?'<span class="pill b-reward">Ready \u2014 ask a parent!</span>':'\u00b7 '+(r.cost-bal)+' to go')+'</div></div></li>';});
@@ -770,19 +829,19 @@ function histList(items,canDelete,showKid){
   if(!items.length)return '<p class="muted">No points yet.</p>';
   var h='<ul class="clean list">';
   items.forEach(function(e){var k=kidById(e.kidId);
-    h+='<li><span class="pill b-'+e.type+'" style="min-inline-size:5.6em;text-align:center">'+TYPE_LABEL[e.type]+'</span>'+(showKid&&k?avatar(k,"sm"):"")+'<div class="grow"><div class="trunc"><strong>'+esc(e.note)+'</strong></div><div class="small muted">'+(showKid&&k?esc(k.name)+" \u00b7 ":"")+dayLabel(e.date)+'</div></div><span class="amt '+(e.amount<0?"neg":"pos")+'">'+fmt(e.amount)+'</span>'+
+    h+='<li><span class="pill b-'+e.type+'" style="min-inline-size:5.6em;text-align:center">'+TYPE_LABEL[e.type]+'</span>'+(showKid&&k?avatar(k,"sm"):"")+'<div class="grow"><div class="trunc"><strong>'+esc(e.note)+'</strong></div><div class="small muted">'+(showKid&&k?esc(k.name)+" \u00b7 ":"")+dayLabel(e.date)+'</div></div>'+(e.photo?'<button class="btn ghost icon" data-action="photo-view" data-id="'+e.id+'" aria-label="See photo: '+esc(e.note)+'">'+camIcon()+'</button>':'')+'<span class="amt '+(e.amount<0?"neg":"pos")+'">'+fmt(e.amount)+'</span>'+
     (canDelete?'<button class="btn ghost icon" data-action="del-entry" data-id="'+e.id+'" aria-label="Delete entry: '+esc(e.note)+'">'+trashIcon()+'</button>':"")+'</li>';});
   return h+'</ul>';
 }
 
 /* ---------- parent panel ---------- */
-var TABS=[["overview","Overview"],["tracker","Daily tracker"],["kids","Kids & logins"],["tasks","Tasks"],["rewards","Rewards"],["history","History"],["family","Family & account"]];
+var TABS=[["overview","Overview"],["tracker","Daily tracker"],["photos","Photos"],["kids","Kids & logins"],["tasks","Tasks"],["rewards","Rewards"],["history","History"],["family","Family & account"]];
 function vParent(){
   var s=session();if(!s||s.kind!=="parent")return vLogin();
   var h=demoNote()+'<div class="row" style="justify-content:space-between;margin-block-end:14px"><h1>Parent panel</h1>'+(MODE==="sheets"?'<button class="btn ghost sm" data-action="refresh">Refresh</button>':'')+'</div><div class="tabs" role="tablist" aria-label="Parent panel sections">';
   TABS.forEach(function(t){h+='<button class="tab" role="tab" id="tab-'+t[0]+'" aria-controls="panel" aria-selected="'+(ui.tab===t[0])+'" tabindex="'+(ui.tab===t[0]?0:-1)+'" data-action="tab" data-id="'+t[0]+'">'+t[1]+'</button>';});
   h+='</div><div id="panel" role="tabpanel" aria-labelledby="tab-'+ui.tab+'">';
-  h+=({overview:pOverview,tracker:pTracker,kids:pKids,tasks:pTasks,rewards:pRewards,history:pHistory,family:pFamily})[ui.tab]();
+  h+=({overview:pOverview,tracker:pTracker,kids:pKids,tasks:pTasks,rewards:pRewards,history:pHistory,family:pFamily,photos:pPhotos})[ui.tab]();
   return h+'</div>';
 }
 function noKids(){return '<div class="card empty"><p>Add your children and create their logins to get started.</p><button class="btn" data-action="kid-add">Add a child</button></div>';}
@@ -835,8 +894,70 @@ function pTasks(){
   if(!data.tasks.length)return h+'<p class="muted">No tasks yet.</p></div>';
   h+='<ul class="clean list">';
   data.tasks.forEach(function(t){var who=t.kidIds.length?t.kidIds.map(function(i){var k=kidById(i);return k?k.name:null;}).filter(Boolean).join(", "):"All kids";
-    h+='<li><span class="pill">+'+t.points+'</span><div class="grow"><strong>'+esc(t.title)+'</strong><div class="small muted">'+esc(scheduleText(t.schedule))+' \u00b7 '+esc(who||"All kids")+'</div></div><button class="btn ghost icon" data-action="task-edit" data-id="'+t.id+'" aria-label="Edit '+esc(t.title)+'">'+editIcon()+'</button><button class="btn ghost icon" data-action="task-del" data-id="'+t.id+'" aria-label="Delete '+esc(t.title)+'">'+trashIcon()+'</button></li>';});
+    h+='<li><span class="pill">+'+t.points+'</span><div class="grow"><strong>'+esc(t.title)+'</strong><div class="small muted">'+esc(scheduleText(t.schedule))+' \u00b7 '+esc(who||"All kids")+(t.photo==="required"?' \u00b7 \ud83d\udcf7 Photo needed':'')+'</div></div><button class="btn ghost icon" data-action="task-edit" data-id="'+t.id+'" aria-label="Edit '+esc(t.title)+'">'+editIcon()+'</button><button class="btn ghost icon" data-action="task-del" data-id="'+t.id+'" aria-label="Delete '+esc(t.title)+'">'+trashIcon()+'</button></li>';});
   return h+'</ul></div>';
+}
+function pPhotos(){
+  var items=data.ledger.filter(function(e){return e.photo&&(ui.histKid==="all"||e.kidId===ui.histKid);});
+  var h='<div class="card"><div class="row" style="justify-content:space-between;margin-block-end:8px"><h2 style="margin:0">Task photos</h2><label class="row small" style="font-weight:600">Child <select data-change="hist-kid" style="inline-size:auto"><option value="all">All kids</option>';
+  data.kids.forEach(function(k){h+='<option value="'+k.id+'"'+(ui.histKid===k.id?" selected":"")+'>'+esc(k.name)+'</option>';});
+  h+='</select></label></div><p class="small muted">Photos kids took when they finished a task. Tap a photo to see it bigger. If a task wasn\'t really done, you can remove the tick and its points.'+(MODE==="sheets"?' Photos are saved privately in the \u201cKids Chore Points photos\u201d folder of your Google Drive.':'')+'</p>';
+  if(!items.length)return h+'<p class="muted">No photos yet. Kids can tap the camera button next to a task to add one. To make a photo required, edit the task and tick \u201cKids must add a photo\u201d.</p></div>';
+  h+='<ul class="clean phgrid">';
+  items.slice(0,60).forEach(function(e){var k=kidById(e.kidId),c=ui.photos[e.id];
+    h+='<li><button class="phbtn" data-action="photo-view" data-id="'+e.id+'" aria-label="See photo: '+esc(e.note)+(k?', '+esc(k.name):'')+', '+esc(longDay(e.date))+'">'+(c?'<img src="'+c+'" alt="">':'<span class="phph" data-ph="'+e.id+'">'+camIcon()+'</span>')+'</button><div class="small" style="margin-block-start:6px"><div class="trunc"><strong>'+esc(e.note)+'</strong></div><div class="muted trunc">'+(k?esc(k.name)+' \u00b7 ':'')+esc(dayLabel(e.date))+' \u00b7 '+fmt(e.amount)+'</div></div></li>';});
+  h+='</ul>';
+  setTimeout(function(){preloadPhotos(items.slice(0,12));},0);
+  return h+'</div>';
+}
+function loadPhoto(id){
+  if(ui.photos[id])return Promise.resolve(ui.photos[id]);
+  return backend.call("getPhoto",{id:id},token).then(function(r){ui.photos[id]=r.photo;return r.photo;});
+}
+var preloading=false;
+function preloadPhotos(list){
+  if(preloading)return;var todo=list.filter(function(e){return !ui.photos[e.id];});if(!todo.length)return;preloading=true;
+  (function next(){
+    var e=todo.shift();if(!e||ui.tab!=="photos"||parseRoute().path!=="parent"){preloading=false;return;}
+    loadPhoto(e.id).then(function(d){var ph=app.querySelector('[data-ph="'+e.id+'"]');if(ph){var im=document.createElement("img");im.src=d;im.alt="";ph.replaceWith(im);}},function(){}).then(next);
+  })();
+}
+function shrinkPhoto(file){
+  var max=MODE==="sheets"?1280:720,q=MODE==="sheets"?0.75:0.6;
+  return new Promise(function(resolve,reject){
+    var url=URL.createObjectURL(file),im=new Image();
+    im.addEventListener("load",function(){try{var w=im.naturalWidth,h=im.naturalHeight,sc=Math.min(1,max/Math.max(w,h));var c=document.createElement("canvas");c.width=Math.round(w*sc);c.height=Math.round(h*sc);
+      var cx=c.getContext("2d");cx.fillStyle="#fff";cx.fillRect(0,0,c.width,c.height);cx.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(url);resolve(c.toDataURL("image/jpeg",q));}catch(x){reject(x);}});
+    im.addEventListener("error",function(){URL.revokeObjectURL(url);reject(new Error("img"));});
+    im.src=url;
+  });
+}
+function photoDialog(kidId,taskId,date){
+  var t=data.tasks.find(function(z){return z.id===taskId;});if(!t)return;
+  var ex=entryFor(kidId,taskId,date);ui.pendingPhoto=null;
+  var body='<p style="margin:0">'+(ex?'Add a photo to show what you did.':(t.photo==="required"?'This task needs a photo. ':'')+'Take a photo of what you did. The task is ticked and you get <strong>+'+t.points+' points</strong> when you send it.')+'</p>'+
+    '<div class="row"><label class="btn"><input type="file" accept="image/*" capture="environment" class="sr" data-photo-in>'+camIcon()+' Take a photo</label><label class="btn outline"><input type="file" accept="image/*" class="sr" data-photo-in>Choose a picture</label></div>'+
+    '<img id="phPrev" class="phprev" alt="Your photo" hidden>';
+  openDialog(t.title,body,async function(){
+    if(!ui.pendingPhoto){dlgErr("Take a photo first.");return false;}
+    var ph=ui.pendingPhoto,sb=dlg.querySelector('[type="submit"]');if(sb)sb.textContent="Sending\u2026";
+    try{
+      if(ex){await api("addPhoto",{id:ex.id,photo:ph});var e1=entryFor(kidId,taskId,date);if(e1)ui.photos[e1.id]=ph;toast("Photo added!");}
+      else{await api("addEntry",{entry:{kidId:kidId,type:"task",taskId:taskId,date:date,photo:ph}});var e2=entryFor(kidId,taskId,date);if(e2)ui.photos[e2.id]=ph;toast("+"+t.points+" points! Great job!");}
+    }finally{if(sb&&sb.isConnected)sb.textContent="Send photo";}
+    ui.pendingPhoto=null;return true;
+  },"Send photo");
+}
+function photoView(id){
+  var e=data.ledger.find(function(z){return z.id===id;});if(!e)return;
+  var k=kidById(e.kidId),s=session(),parent=s&&s.kind==="parent",today=dkey();
+  var kidCan=!parent&&e.date>=addDays(today,-1);
+  var body='<p class="small muted" style="margin:0">'+(k?esc(k.name)+' \u00b7 ':'')+esc(longDay(e.date))+' \u00b7 '+fmt(e.amount)+' points</p><div class="phbig"><img id="phBig" alt="Photo for '+esc(e.note)+'" hidden><p id="phLoad" class="muted" role="status">Loading photo\u2026</p></div>'+
+    (parent?'<button type="button" class="btn outline sm" data-action="photo-reject" data-id="'+e.id+'">Not done? Remove the tick</button>':'')+
+    (kidCan?'<button type="button" class="btn outline sm" data-action="kid-photo" data-task="'+esc(e.taskId)+'" data-date="'+e.date+'">'+camIcon()+' Take a new photo</button>':'');
+  openDialog(e.note,body,function(){return true;},"Close",false,true);
+  loadPhoto(id).then(function(d){var im=document.getElementById("phBig"),l=document.getElementById("phLoad");if(!im)return;im.src=d;im.hidden=false;if(l)l.remove();},
+    function(x){var l=document.getElementById("phLoad");if(l)l.textContent=x&&x.code==="not-found"?"This photo is no longer available.":friendly(x);});
 }
 function pRewards(){
   var h='<div class="card"><div class="row" style="justify-content:space-between;margin-block-end:8px"><h2 style="margin:0">Rewards</h2><button class="btn sm" data-action="reward-add">Add reward</button></div>';
@@ -927,6 +1048,7 @@ function taskForm(t){
   h+='</div></fieldset><label class="f freq-once"'+(mode==="once"?"":" hidden")+'>Date<input type="date" name="once" value="'+esc(once)+'"></label>';
   if(data.kids.length){h+='<fieldset style="border:0;padding:0;margin:0"><legend style="font-weight:600;margin-block-end:6px">Who does this task? <span class="small muted">(none ticked = all kids)</span></legend><div class="checks">';
     data.kids.forEach(function(k){h+='<label><input type="checkbox" name="kid" value="'+k.id+'"'+(t&&t.kidIds.indexOf(k.id)>=0?" checked":"")+'> '+esc(k.name)+'</label>';});h+='</div></fieldset>';}
+  h+='<label class="row" style="flex-wrap:nowrap;align-items:flex-start;gap:8px"><input type="checkbox" name="needphoto" style="inline-size:auto;margin-block-start:4px"'+(t&&t.photo==="required"?" checked":"")+'><span>Kids must add a photo to finish this task<span class="small muted" style="display:block">Kids can always add a photo to any task; this makes it required.</span></span></label>';
   return h;
 }
 function taskSubmit(t){return async function(fd){
@@ -935,7 +1057,7 @@ function taskSubmit(t){return async function(fd){
   var freq=fd.get("freq")||"daily",schedule="daily";
   if(freq==="days"){var wd=fd.getAll("wd").map(String);if(!wd.length){dlgErr("Pick at least one day.");return false;}schedule="days:"+wd.sort().join(",");}
   if(freq==="once"){var d=String(fd.get("once")||"");if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){dlgErr("Pick a date.");return false;}schedule="once:"+d;}
-  var task={title:title,points:pts,kidIds:fd.getAll("kid").map(String),schedule:schedule};if(t)task.id=t.id;
+  var task={title:title,points:pts,kidIds:fd.getAll("kid").map(String),schedule:schedule,photo:fd.get("needphoto")?"required":""};if(t)task.id=t.id;
   await api("saveTask",{task:task});toast(t?"Task saved":"Task added");return true;};}
 function rewardForm(r){return '<label class="f">Reward<input type="text" name="title" maxlength="60" value="'+(r?esc(r.title):"")+'" required></label><label class="f">Points needed<input type="number" name="cost" min="1" max="100000" value="'+(r?r.cost:50)+'"></label>';}
 function rewardSubmit(r){return async function(fd){
@@ -976,7 +1098,9 @@ function parentAddDialog(){
 /* ---------- events ---------- */
 function toggleTask(kidId,taskId,date,btn){
   var k=okey(kidId,taskId,date);if(k in ui.optimistic)return;
-  var ex=entryFor(kidId,taskId,date),t=data.tasks.find(function(z){return z.id===taskId;});
+  var ex=entryFor(kidId,taskId,date),t=data.tasks.find(function(z){return z.id===taskId;}),isKid=session().kind==="kid";
+  if(!ex&&isKid&&t&&t.photo==="required"){photoDialog(kidId,taskId,date);return;}
+  if(ex&&ex.photo&&!toggleTask.ok){confirmBox("Untick "+(t?t.title:"this task")+"?","The points and the photo for this day will be removed.","Untick",function(){toggleTask.ok=true;try{toggleTask(kidId,taskId,date,null);}finally{toggleTask.ok=false;}return true;});return;}
   ui.optimistic[k]=!ex;render();refocus(kidId,taskId,date,btn);
   var p=ex?api("deleteEntry",{id:ex.id}):api("addEntry",{entry:{kidId:kidId,type:"task",taskId:taskId,date:date}});
   p.then(function(){delete ui.optimistic[k];render();refocus(kidId,taskId,date,btn);if(!ex&&t&&session().kind==="kid")toast("+"+t.points+" points! Great job!");},
@@ -999,6 +1123,9 @@ document.addEventListener("click",function(ev){
     case "refresh":quiet(refresh(),"Up to date");break;
     case "logout":{var t0=token;setToken(null);data=null;ui.optimistic={};backend.call("logout",{},t0).catch(function(){});go("");toast("Logged out");break;}
     case "forgot":info("Forgot your password?",'<p style="margin:0">'+(MODE==="sheets"?"Ask the person who owns your family's Google Sheet to open it and choose <strong>Kids Chore Points \u2192 Reset a parent's password</strong> from the menu. Another parent can also add you again from the Parent panel.":"In demo mode, register again or ask another parent in your family to add you again.")+'</p>');break;
+    case "kid-photo":{var s1=session();if(s1&&s1.kind==="kid"){var tid=el.getAttribute("data-task"),dd=el.getAttribute("data-date"),en=entryFor(s1.id,tid,dd);if(en&&en.photo&&!dlg.contains(el))photoView(en.id);else photoDialog(s1.id,tid,dd);}break;}
+    case "photo-view":photoView(did);break;
+    case "photo-reject":{var pe=data.ledger.find(function(z){return z.id===did;});if(pe){var pk=kidById(pe.kidId);confirmBox("Remove this tick?",Math.abs(pe.amount)+" points"+(pk?" for "+pk.name:"")+" and the photo for \u201c"+pe.note+"\u201d will be removed.","Remove",async function(){await api("deleteEntry",{id:pe.id});delete ui.photos[pe.id];toast("Tick removed");return true;});}break;}
     case "toggle":toggleTask(el.getAttribute("data-kid"),el.getAttribute("data-task"),el.getAttribute("data-date"),el);break;
     case "tab":ui.tab=did;ui.showAll=false;render();var tb=document.getElementById("tab-"+did);if(tb)tb.focus();break;
     case "track-kid":ui.trackKid=did;ui.tab="tracker";render();break;
@@ -1036,6 +1163,11 @@ document.addEventListener("keydown",function(ev){
 document.addEventListener("change",function(ev){
   var el=ev.target;
   if(el.getAttribute("data-change")==="hist-kid"){ui.histKid=el.value;ui.showAll=false;render();var s=app.querySelector('[data-change="hist-kid"]');if(s)s.focus();}
+  if(el.hasAttribute&&el.hasAttribute("data-photo-in")&&el.files&&el.files[0]){
+    dlgErr("");var pv=document.getElementById("phPrev");
+    shrinkPhoto(el.files[0]).then(function(d){ui.pendingPhoto=d;if(pv){pv.src=d;pv.hidden=false;}var sb=dlg.querySelector('[type="submit"]');if(sb)sb.focus();},function(){dlgErr("That picture couldn't be opened. Try taking it again.");});
+    el.value="";
+  }
   if(el.name==="freq"&&dlg.contains(el)){var d=dlg.querySelector(".freq-days"),o=dlg.querySelector(".freq-once");if(d)d.hidden=el.value!=="days";if(o)o.hidden=el.value!=="once";}
 });
 document.addEventListener("submit",async function(ev){
