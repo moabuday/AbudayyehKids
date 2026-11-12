@@ -98,7 +98,7 @@ ul.clean{list-style:none;margin:0;padding:0}
 .quick{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-block:12px}
 form.stack{display:grid;gap:12px}
 label.f{display:grid;gap:5px;font-weight:600;font-size:.92rem}
-input[type=text],input[type=number],input[type=password],select{border:1px solid var(--border);background:var(--card);border-radius:10px;padding:9px 11px;min-block-size:40px;inline-size:100%}
+input[type=text],input[type=number],input[type=password],input[type=email],select{border:1px solid var(--border);background:var(--card);border-radius:10px;padding:9px 11px;min-block-size:40px;inline-size:100%}
 .seg{display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
 .seg label{flex:1;text-align:center;padding:8px;cursor:pointer;font-weight:600}
 .seg input{position:absolute;opacity:0;pointer-events:none}
@@ -130,210 +130,393 @@ svg text{font-family:inherit}
 .toast.show{opacity:1}
 footer{color:var(--muted);font-size:.85rem;text-align:center;padding:24px}
 @media (forced-colors: active){.btn,.task,.kidbtn,.tab{border:1px solid ButtonText}.task[aria-pressed="true"],.kidbtn[aria-pressed="true"],.tab[aria-selected="true"]{outline:3px solid Highlight}}
+.brandbtn{background:none;border:0;padding:0;cursor:pointer}
+.home{display:grid;gap:20px;grid-template-columns:1fr 1fr;margin-block-start:20px}
+@media (max-width:760px){.home{grid-template-columns:1fr}}
+.home .card{display:flex;flex-direction:column;gap:10px}
+.lead{font-size:1.1rem;max-inline-size:640px}
+.steps{list-style:none;padding:0;display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin-block-start:20px}
+.num{inline-size:30px;block-size:30px;border-radius:50%;background:var(--primary-soft);color:var(--fg);display:grid;place-items:center;font-weight:800;flex:none}
+.code{font-family:ui-monospace,Consolas,monospace;font-size:1.6rem;font-weight:800;letter-spacing:.15em}
+.linkbox{font-family:ui-monospace,Consolas,monospace;font-size:.85rem;background:var(--soft);border-radius:8px;padding:8px 10px;overflow-wrap:anywhere}
+.kidhero{max-inline-size:440px;margin:30px auto}
+.kidhero input{font-size:1.15rem;min-block-size:48px}
+.kidhero .btn{min-block-size:48px;font-size:1.05rem}
+.tag{display:inline-block;border-radius:6px;padding:1px 8px;font-size:.8rem;font-weight:600;background:var(--soft)}
+.tag.ok{background:var(--ok-soft);color:var(--ok-fg)}
+.loading{padding:60px;text-align:center;color:var(--muted)}
+.linkbtn{background:none;border:0;padding:0;color:var(--primary);font-weight:600;cursor:pointer;text-decoration:underline}
+@media (max-width:560px){.hide-sm{display:none}}
 </style>
 </head>
 <body>
 <header class="top"><div class="wrap">
-  <div class="brand"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.4 5 5.4.6-4 3.7 1.1 5.4L12 15.5l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/></svg></span>Kids Chore Points</div>
+  <button class="brand brandbtn" data-action="home" aria-label="Kids Chore Points home"><span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.4 5 5.4.6-4 3.7 1.1 5.4L12 15.5l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/></svg></span><span class="hide-sm">Kids Chore Points</span></button>
   <span class="family" id="familyName"></span>
   <span class="spacer"></span>
   <nav id="nav" class="row" aria-label="Main"></nav>
 </div></header>
 <main id="app" class="wrap" tabindex="-1"></main>
-<footer>Data is saved in this browser on this device. Use Parent panel → Settings → Download backup to move it to another device.</footer>
+<footer>Kids Chore Points</footer>
 <dialog id="dlg" aria-labelledby="dlgTitle"></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
+/* =====================================================================
+   ONLINE ACCOUNTS (optional) - see README.md, "Connect Firebase".
+   Leave this as null to run in demo mode (everything stays in this browser).
+   To let parents and kids log in from any device, replace null with the
+   firebaseConfig object from your Firebase project, for example:
+   window.KCP_FIREBASE_CONFIG = { apiKey: "...", authDomain: "...", projectId: "...", appId: "..." };
+   ===================================================================== */
+window.KCP_FIREBASE_CONFIG = null;
+</script>
+<script>
 (function(){
 "use strict";
-var KEY="kidsChorePoints:v1";
-var VERSION=1;
+/* ================= shared helpers ================= */
 var COLORS=6;
 var DEFAULT_TASKS=[["Make your bed",5],["Get dressed by yourself",5],["Brush teeth (morning & night)",3],["Help mom with cleaning",10],["Tidy up your toys",5],["Finish homework",10],["Help set the table",5]];
 var DEFAULT_REWARDS=[["Ice cream treat",30],["Extra 30 min screen time",50],["Trip to the park",100],["Pick a new toy",200]];
 var QUICK=[["Good behaviour",5],["Extra helpful",10],["Not listening",-5],["Fighting",-10]];
 var TYPE_LABEL={task:"Task",bonus:"Bonus",deduction:"Deducted",reward:"Reward"};
+var CODE_CHARS="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+var LAST_FAMILY="kidsChorePoints:lastFamily";
 
-/* ---------- utils ---------- */
-function uid(){try{return crypto.randomUUID();}catch(e){return Date.now().toString(36)+Math.random().toString(36).slice(2,10);}}
-function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
-function dkey(d){d=d||new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
-function fmt(n){return (n>0?"+":n<0?"\u2212":"")+Math.abs(n);}
-function dayLabel(k){var t=dkey();if(k===t)return "Today";var y=new Date();y.setDate(y.getDate()-1);if(k===dkey(y))return "Yesterday";var p=k.split("-").map(Number);return new Date(p[0],p[1]-1,p[2]).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}
-function initial(n){return (String(n).trim().charAt(0)||"?").toUpperCase();}
-function avatar(k,size){return '<span class="avatar '+(size||"")+' c'+(k.color%COLORS)+'" aria-hidden="true">'+esc(initial(k.name))+'</span>';}
-function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove("show");},2200);}
+function id(){var a="";try{var b=new Uint8Array(8);crypto.getRandomValues(b);b.forEach(function(x){a+=(x%36).toString(36);});}catch(e){a=Math.random().toString(36).slice(2,10);}return "x"+Date.now().toString(36)+a;}
+function genCode(){var s="";try{var b=new Uint8Array(6);crypto.getRandomValues(b);b.forEach(function(x){s+=CODE_CHARS[x%CODE_CHARS.length];});}catch(e){for(var i=0;i<6;i++)s+=CODE_CHARS[Math.floor(Math.random()*CODE_CHARS.length)];}return s;}
+function err(code,msg){var e=new Error(msg||code);e.code=code;return e;}
+function kidPw(p){return "kcp-"+p;}
+function clone(o){return JSON.parse(JSON.stringify(o));}
 function fallbackHash(s){var h1=0x811c9dc5,h2=0x1b873593;for(var i=0;i<s.length;i++){h1^=s.charCodeAt(i);h1=Math.imul(h1,16777619);h2=Math.imul(h2^s.charCodeAt(i),2654435761);}return "f"+(h1>>>0).toString(16)+(h2>>>0).toString(16);}
-function hashPin(pin,salt){
-  var text=salt+":"+pin;
-  try{
-    if(window.crypto&&crypto.subtle&&window.TextEncoder){
-      return crypto.subtle.digest("SHA-256",new TextEncoder().encode(text)).then(function(buf){
-        return "s"+Array.prototype.map.call(new Uint8Array(buf),function(b){return b.toString(16).padStart(2,"0");}).join("");
-      }).catch(function(){return fallbackHash(text);});
-    }
-  }catch(e){}
+function hashText(text){
+  try{if(window.crypto&&crypto.subtle&&window.TextEncoder){
+    return crypto.subtle.digest("SHA-256",new TextEncoder().encode(text)).then(function(buf){return "s"+Array.prototype.map.call(new Uint8Array(buf),function(b){return b.toString(16).padStart(2,"0");}).join("");}).catch(function(){return fallbackHash(text);});}}catch(e){}
   return Promise.resolve(fallbackHash(text));
 }
-
-/* ---------- storage ---------- */
-var state=null, storageOK=true, loadProblem=false;
-function blank(){return {version:VERSION,family:"",pin:null,kids:[],tasks:[],rewards:[],ledger:[]};}
-function valid(d){
-  if(!d||typeof d!=="object"||d.version!==VERSION)return false;
-  if(!Array.isArray(d.kids)||!Array.isArray(d.tasks)||!Array.isArray(d.rewards)||!Array.isArray(d.ledger))return false;
-  var S=function(v){return typeof v==="string";},N=function(v){return typeof v==="number"&&isFinite(v);};
-  return d.kids.every(function(k){return k&&S(k.id)&&S(k.name)&&N(k.color);})&&
-    d.tasks.every(function(t){return t&&S(t.id)&&S(t.title)&&N(t.points)&&Array.isArray(t.kidIds);})&&
-    d.rewards.every(function(r){return r&&S(r.id)&&S(r.title)&&N(r.cost);})&&
-    d.ledger.every(function(e){return e&&S(e.id)&&S(e.kidId)&&S(e.date)&&N(e.ts)&&N(e.amount)&&S(e.note)&&TYPE_LABEL[e.type];});
+function newFamily(code,o,uid,email){
+  return {code:code,name:o.familyName,kids:[],totals:{},createdAt:Date.now(),
+    parents:[{uid:uid,name:o.parentName,email:email}],
+    tasks:o.defaults?DEFAULT_TASKS.map(function(t){return {id:id(),title:t[0],points:t[1],kidIds:[]};}):[],
+    rewards:o.defaults?DEFAULT_REWARDS.map(function(r){return {id:id(),title:r[0],cost:r[1]};}):[]};
 }
-function load(){
-  try{
-    var raw=localStorage.getItem(KEY);
-    if(raw===null){state=blank();return;}
-    var d=JSON.parse(raw);
-    if(valid(d)){state=d;}else{state=blank();loadProblem=true;}
-  }catch(e){
-    if(e instanceof SyntaxError){loadProblem=true;}else{storageOK=false;}
-    state=blank();
-  }
+function kidEmail(fid,username){return (fid+"-"+username+"-"+Date.now().toString(36)+"@kids.example.com").toLowerCase();}
+
+/* ================= demo store: everything in this browser ================= */
+function demoStore(){
+  var K="kidsChorePoints:demo:v2",SK="kidsChorePoints:demo:session";
+  var db=null,subs=[],authCb=null;
+  function read(){var d=null;try{var r=localStorage.getItem(K);if(r)d=JSON.parse(r);}catch(e){}
+    if(!d||typeof d!=="object"||!d.accounts||!d.users||!d.logins||!d.families)d={accounts:{},users:{},logins:{},families:{}};db=d;}
+  function notify(){subs.slice().forEach(function(f){f();});}
+  function write(){try{localStorage.setItem(K,JSON.stringify(db));}catch(e){throw err("storage");}notify();}
+  function getSid(){try{return localStorage.getItem(SK);}catch(e){return null;}}
+  function setSid(v){try{if(v)localStorage.setItem(SK,v);else localStorage.removeItem(SK);}catch(e){}}
+  function prof(uid){var u=uid&&db.users[uid];return u?{uid:uid,role:u.role,familyId:u.familyId,kidId:u.kidId||null,name:u.name||"",email:u.email||""}:null;}
+  async function makeAcct(email,pw){if(db.accounts[email])throw err("auth/email-already-in-use");var salt=id(),uid=id();db.accounts[email]={uid:uid,salt:salt,hash:await hashText(salt+":"+pw)};return uid;}
+  async function check(email,pw){var a=db.accounts[email];if(!a)throw err("bad-login");if(await hashText(a.salt+":"+pw)!==a.hash)throw err("bad-login");return a.uid;}
+  function fam(fid){var f=db.families[fid];if(!f)throw err("not-found");return f;}
+  function dropAcct(uid){Object.keys(db.accounts).forEach(function(e){if(db.accounts[e].uid===uid)delete db.accounts[e];});delete db.users[uid];}
+  function dropKidLogin(fid,k){if(k.uid)dropAcct(k.uid);if(k.username)delete db.logins[fid+"_"+k.username];k.username=null;k.uid=null;}
+  window.addEventListener("storage",function(e){
+    if(e.key===K){read();notify();}
+    else if(e.key===SK&&authCb){read();authCb(prof(getSid()));}
+  });
+  return {
+    mode:"demo",
+    init:async function(cb){authCb=cb;read();cb(prof(getSid()));},
+    register:async function(o){read();var email=o.email.trim().toLowerCase();
+      var uid=await makeAcct(email,o.password);var code;do{code=genCode();}while(db.families[code]);
+      db.users[uid]={role:"parent",familyId:code,name:o.parentName,email:email};
+      var f=newFamily(code,o,uid,email);f.ledger=[];db.families[code]=f;write();setSid(uid);return prof(uid);},
+    loginParent:async function(email,pw){read();var uid=await check(email.trim().toLowerCase(),pw);if(!db.users[uid])throw err("bad-login");setSid(uid);return prof(uid);},
+    loginKid:async function(code,username,pw){read();var l=db.logins[code+"_"+username];if(!l)throw err("bad-login");var uid=await check(l.email,kidPw(pw));if(!db.users[uid])throw err("bad-login");setSid(uid);return prof(uid);},
+    logout:async function(){setSid(null);},
+    sendReset:async function(){throw err("demo-only");},
+    changePassword:async function(oldPw,newPw){read();var s=prof(getSid());if(!s)throw err("bad-login");await check(s.email,oldPw);var a=db.accounts[s.email];a.salt=id();a.hash=await hashText(a.salt+":"+newPw);write();},
+    watchFamily:function(fid,cb){var f=function(){var x=db.families[fid];if(!x)return cb(null);var c=clone(x);var l=c.ledger||[];delete c.ledger;cb({fam:c,ledger:l.sort(function(a,b){return b.ts-a.ts;}).slice(0,500)});};
+      subs.push(f);f();return function(){subs=subs.filter(function(z){return z!==f;});};},
+    mutate:async function(fid,fn){read();var f=fam(fid);Object.assign(f,fn(clone(f)));write();},
+    addEntry:async function(fid,e){read();var f=fam(fid);f.ledger.push(e);f.totals[e.kidId]=(f.totals[e.kidId]||0)+e.amount;write();},
+    deleteEntry:async function(fid,e){read();var f=fam(fid);var i=f.ledger.findIndex(function(x){return x.id===e.id;});if(i<0)return;f.ledger.splice(i,1);f.totals[e.kidId]=(f.totals[e.kidId]||0)-e.amount;write();},
+    setKidLogin:async function(fid,kidId,username,pw){read();var f=fam(fid);var k=f.kids.find(function(x){return x.id===kidId;});if(!k)throw err("not-found");
+      var lid=fid+"_"+username;if(db.logins[lid]&&db.logins[lid].kidId!==kidId)throw err("username-taken");
+      var email=kidEmail(fid,username);var uid=await makeAcct(email,kidPw(pw));dropKidLogin(fid,k);
+      db.users[uid]={role:"kid",familyId:fid,kidId:kidId,name:k.name};db.logins[lid]={email:email,familyId:fid,kidId:kidId,uid:uid};
+      k.username=username;k.uid=uid;write();},
+    removeKidLogin:async function(fid,kidId){read();var f=fam(fid);var k=f.kids.find(function(x){return x.id===kidId;});if(!k)return;dropKidLogin(fid,k);write();},
+    deleteKid:async function(fid,kidId){read();var f=fam(fid);var k=f.kids.find(function(x){return x.id===kidId;});if(!k)return;dropKidLogin(fid,k);
+      f.kids=f.kids.filter(function(x){return x.id!==kidId;});f.tasks.forEach(function(t){t.kidIds=t.kidIds.filter(function(x){return x!==kidId;});});
+      delete f.totals[kidId];f.ledger=f.ledger.filter(function(e){return e.kidId!==kidId;});write();},
+    addParent:async function(fid,name,email,pw){read();var f=fam(fid);email=email.trim().toLowerCase();var uid=await makeAcct(email,pw);
+      db.users[uid]={role:"parent",familyId:fid,name:name,email:email};f.parents.push({uid:uid,name:name,email:email});write();},
+    removeParent:async function(fid,uid){read();var f=fam(fid);f.parents=f.parents.filter(function(p){return p.uid!==uid;});dropAcct(uid);write();}
+  };
 }
-function save(){
-  if(loadProblem)return false;
-  try{localStorage.setItem(KEY,JSON.stringify(state));storageOK=true;return true;}
-  catch(e){storageOK=false;return false;}
+
+/* ================= cloud store: Firebase (Auth + Firestore) ================= */
+function cloudStore(cfg){
+  var V="10.12.2",BASE="https://www.gstatic.com/firebasejs/"+V+"/";
+  var A,AU,FS,app,auth,db,loading=null,suppress=0,authCb=null;
+  function load(){if(!loading)loading=Promise.all([import(BASE+"firebase-app.js"),import(BASE+"firebase-auth.js"),import(BASE+"firebase-firestore.js")]).then(function(m){
+    A=m[0];AU=m[1];FS=m[2];app=A.initializeApp(cfg);auth=AU.getAuth(app);db=FS.getFirestore(app);});return loading;}
+  function famRef(fid){return FS.doc(db,"families",fid);}
+  async function profile(user){var s=await FS.getDoc(FS.doc(db,"users",user.uid));
+    if(!s.exists())return {uid:user.uid,email:user.email||"",role:null,familyId:null,kidId:null,name:""};
+    var d=s.data();return {uid:user.uid,email:user.email||"",role:d.role,familyId:d.familyId,kidId:d.kidId||null,name:d.name||""};}
+  async function quiet(fn){suppress++;try{return await fn();}finally{suppress--;}}
+  async function makeUser(email,pw){var sec=A.initializeApp(cfg,"helper-"+id());
+    try{var sa=AU.initializeAuth(sec,{persistence:AU.inMemoryPersistence});var c=await AU.createUserWithEmailAndPassword(sa,email,pw);var uid=c.user.uid;await AU.signOut(sa);return uid;}
+    finally{try{await A.deleteApp(sec);}catch(e){}}}
+  function kidOf(d,kidId){var k=(d.kids||[]).find(function(x){return x.id===kidId;});if(!k)throw err("not-found");return k;}
+  return {
+    mode:"cloud",
+    init:async function(cb){authCb=cb;await load();AU.onAuthStateChanged(auth,async function(u){if(suppress)return;if(!u)return cb(null);try{cb(await profile(u));}catch(e){cb(null);}});},
+    register:function(o){return quiet(async function(){
+      var user=auth.currentUser;
+      if(!user||(o.email&&user.email!==o.email.trim().toLowerCase())){if(user)await AU.signOut(auth);user=(await AU.createUserWithEmailAndPassword(auth,o.email.trim(),o.password)).user;}
+      for(var i=0;i<4;i++){var code=genCode();var b=FS.writeBatch(db);
+        b.set(FS.doc(db,"users",user.uid),{role:"parent",familyId:code,name:o.parentName,email:user.email});
+        b.set(famRef(code),newFamily(code,o,user.uid,user.email));
+        try{await b.commit();return await profile(user);}catch(e){if(e.code!=="permission-denied"||i===3)throw e;}}
+    });},
+    loginParent:function(email,pw){return quiet(async function(){var c=await AU.signInWithEmailAndPassword(auth,email.trim(),pw);return profile(c.user);});},
+    loginKid:function(code,username,pw){return quiet(async function(){
+      if(auth.currentUser)await AU.signOut(auth);
+      var s=await FS.getDoc(FS.doc(db,"logins",code+"_"+username));if(!s.exists())throw err("bad-login");
+      var c=await AU.signInWithEmailAndPassword(auth,s.data().email,kidPw(pw));var p=await profile(c.user);
+      if(!p.role){await AU.signOut(auth);throw err("bad-login");}return p;});},
+    logout:function(){return quiet(function(){return AU.signOut(auth);});},
+    sendReset:function(email){return AU.sendPasswordResetEmail(auth,email.trim());},
+    changePassword:async function(oldPw,newPw){var u=auth.currentUser;if(!u)throw err("bad-login");
+      await AU.reauthenticateWithCredential(u,AU.EmailAuthProvider.credential(u.email,oldPw));await AU.updatePassword(u,newPw);},
+    watchFamily:function(fid,cb){var f=null,l=null;function emit(){if(f!==null&&l!==null)cb(f===false?null:{fam:f,ledger:l});}
+      function onErr(e){cb(null,e);}
+      var u1=FS.onSnapshot(famRef(fid),function(s){f=s.exists()?s.data():false;emit();},onErr);
+      var u2=FS.onSnapshot(FS.query(FS.collection(db,"families",fid,"ledger"),FS.orderBy("ts","desc"),FS.limit(500)),function(s){l=s.docs.map(function(d){return d.data();});emit();},onErr);
+      return function(){u1();u2();};},
+    mutate:function(fid,fn){return FS.runTransaction(db,async function(tx){var s=await tx.get(famRef(fid));if(!s.exists())throw err("not-found");tx.update(famRef(fid),fn(s.data()));});},
+    addEntry:function(fid,e){var b=FS.writeBatch(db);b.set(FS.doc(db,"families",fid,"ledger",e.id),e);var p={};p["totals."+e.kidId]=FS.increment(e.amount);b.update(famRef(fid),p);return b.commit();},
+    deleteEntry:function(fid,e){var b=FS.writeBatch(db);b.delete(FS.doc(db,"families",fid,"ledger",e.id));var p={};p["totals."+e.kidId]=FS.increment(-e.amount);b.update(famRef(fid),p);return b.commit();},
+    setKidLogin:async function(fid,kidId,username,pw){
+      var lid=fid+"_"+username,ls=await FS.getDoc(FS.doc(db,"logins",lid));
+      if(ls.exists()&&ls.data().kidId!==kidId)throw err("username-taken");
+      var email=kidEmail(fid,username),uid=await makeUser(email,kidPw(pw));
+      await FS.runTransaction(db,async function(tx){var s=await tx.get(famRef(fid));if(!s.exists())throw err("not-found");var d=s.data(),k=kidOf(d,kidId);
+        if(k.uid)tx.delete(FS.doc(db,"users",k.uid));
+        if(k.username&&k.username!==username)tx.delete(FS.doc(db,"logins",fid+"_"+k.username));
+        tx.set(FS.doc(db,"users",uid),{role:"kid",familyId:fid,kidId:kidId,name:k.name});
+        tx.set(FS.doc(db,"logins",lid),{email:email,familyId:fid,kidId:kidId,uid:uid});
+        tx.update(famRef(fid),{kids:d.kids.map(function(x){return x.id===kidId?Object.assign({},x,{username:username,uid:uid}):x;})});});},
+    removeKidLogin:function(fid,kidId){return FS.runTransaction(db,async function(tx){var s=await tx.get(famRef(fid));var d=s.data(),k=kidOf(d,kidId);
+        if(k.uid)tx.delete(FS.doc(db,"users",k.uid));if(k.username)tx.delete(FS.doc(db,"logins",fid+"_"+k.username));
+        tx.update(famRef(fid),{kids:d.kids.map(function(x){return x.id===kidId?Object.assign({},x,{username:null,uid:null}):x;})});});},
+    deleteKid:async function(fid,kidId){
+      await FS.runTransaction(db,async function(tx){var s=await tx.get(famRef(fid));var d=s.data(),k=kidOf(d,kidId);
+        if(k.uid)tx.delete(FS.doc(db,"users",k.uid));if(k.username)tx.delete(FS.doc(db,"logins",fid+"_"+k.username));
+        var p={kids:d.kids.filter(function(x){return x.id!==kidId;}),tasks:d.tasks.map(function(t){return Object.assign({},t,{kidIds:t.kidIds.filter(function(x){return x!==kidId;})});})};
+        p["totals."+kidId]=FS.deleteField();tx.update(famRef(fid),p);});
+      var q=await FS.getDocs(FS.query(FS.collection(db,"families",fid,"ledger"),FS.where("kidId","==",kidId)));
+      for(var i=0;i<q.docs.length;i+=400){var b=FS.writeBatch(db);q.docs.slice(i,i+400).forEach(function(d){b.delete(d.ref);});await b.commit();}},
+    addParent:async function(fid,name,email,pw){email=email.trim().toLowerCase();var uid=await makeUser(email,pw);
+      await FS.runTransaction(db,async function(tx){var s=await tx.get(famRef(fid));var d=s.data();
+        tx.set(FS.doc(db,"users",uid),{role:"parent",familyId:fid,name:name,email:email});
+        tx.update(famRef(fid),{parents:(d.parents||[]).concat([{uid:uid,name:name,email:email}])});});},
+    removeParent:function(fid,uid){return FS.runTransaction(db,async function(tx){var s=await tx.get(famRef(fid));var d=s.data();
+        tx.delete(FS.doc(db,"users",uid));tx.update(famRef(fid),{parents:(d.parents||[]).filter(function(p){return p.uid!==uid;})});});}
+  };
 }
-function commit(mut,msg){mut(state);var ok=save();render();if(msg)toast(ok?msg:"Not saved in this browser");}
-window.addEventListener("storage",function(e){
-  if(e.key!==KEY||e.newValue===null)return;
-  try{var d=JSON.parse(e.newValue);if(valid(d)){state=d;render();}}catch(err){}
-});
 
-/* ---------- derived ---------- */
-function balance(id){return state.ledger.reduce(function(s,e){return e.kidId===id?s+e.amount:s;},0);}
-function tasksFor(id){return state.tasks.filter(function(t){return !t.kidIds.length||t.kidIds.indexOf(id)>=0;});}
-function doneToday(kidId,taskId){var t=dkey();return state.ledger.find(function(e){return e.kidId===kidId&&e.type==="task"&&e.taskId===taskId&&e.date===t;});}
-function kidById(id){return state.kids.find(function(k){return k.id===id;});}
-function addEntry(kidId,type,amount,note,taskId){state.ledger.push({id:uid(),kidId:kidId,date:dkey(),ts:Date.now(),amount:amount,type:type,note:note,taskId:taskId||undefined});}
+/* ================= app ================= */
+var CFG=window.KCP_FIREBASE_CONFIG||null;
+var store=CFG?cloudStore(CFG):demoStore();
+var session; /* undefined = loading, null = signed out */
+var fam=null,ledger=[],famErr=null,unwatch=null;
+var ui={tab:"overview",histKid:"all",showAll:false,pending:{}};
+var app=document.getElementById("app"),dlg=document.getElementById("dlg");
 
-/* ---------- ui state ---------- */
-var ui={view:"kids",kidId:null,tab:"overview",unlocked:false,histKid:"all",showAll:false,pendingConfirm:null};
-var app=document.getElementById("app");
-var dlg=document.getElementById("dlg");
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+function dkey(d){d=d||new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+function fmt(n){return (n>0?"+":n<0?"\u2212":"")+Math.abs(n);}
+function dayLabel(k){if(k===dkey())return "Today";var y=new Date();y.setDate(y.getDate()-1);if(k===dkey(y))return "Yesterday";var p=k.split("-").map(Number);return new Date(p[0],p[1]-1,p[2]).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"});}
+function initial(n){return (String(n||"").trim().charAt(0)||"?").toUpperCase();}
+function avatar(k,size){return '<span class="avatar '+(size||"")+' c'+((k.color||0)%COLORS)+'" aria-hidden="true">'+esc(initial(k.name))+'</span>';}
+function toast(msg){var t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(function(){t.classList.remove("show");},2600);}
+function trashIcon(){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';}
+function editIcon(){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';}
+function keyIcon(){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3"/></svg>';}
+function intIn(v,lo,hi){var n=Number(v);return String(v).trim()!==""&&Number.isInteger(n)&&n>=lo&&n<=hi?n:null;}
+function friendly(e){
+  var c=(e&&e.code)||"";
+  var m={"auth/email-already-in-use":"An account with this email already exists. Try logging in instead.",
+    "bad-login":"Those login details aren't right. Check them and try again.","auth/invalid-credential":"Those login details aren't right. Check them and try again.",
+    "auth/invalid-login-credentials":"Those login details aren't right. Check them and try again.","auth/wrong-password":"That password isn't right.","auth/user-not-found":"Those login details aren't right. Check them and try again.",
+    "auth/weak-password":"That password is too weak. Use at least 6 characters.","auth/invalid-email":"Enter a valid email address.",
+    "auth/too-many-requests":"Too many attempts. Wait a few minutes and try again.","auth/network-request-failed":"No internet connection. Check it and try again.",
+    "unavailable":"Can't reach the server. Check your internet connection.","permission-denied":"You don't have permission to do that.",
+    "auth/requires-recent-login":"For safety, log out and back in, then try again.","auth/operation-not-allowed":"Email/password sign-in isn't turned on in Firebase yet (see README).",
+    "username-taken":"That username is already used in your family. Pick another one.","storage":"This browser isn't letting the site save data.",
+    "not-found":"That item no longer exists.","demo-only":"Password reset emails work once the site is connected to Firebase."};
+  return m[c]||"Something went wrong. Please try again.";
+}
+function balance(kidId){return (fam&&fam.totals&&fam.totals[kidId])||0;}
+function kidById(i){return fam?fam.kids.find(function(k){return k.id===i;}):null;}
+function tasksFor(kidId){return fam.tasks.filter(function(t){return !t.kidIds.length||t.kidIds.indexOf(kidId)>=0;});}
+function doneToday(kidId,taskId){var t=dkey();return ledger.find(function(e){return e.kidId===kidId&&e.type==="task"&&e.taskId===taskId&&e.date===t;});}
+function entry(kidId,type,amount,note,taskId){var e={id:id(),kidId:kidId,date:dkey(),ts:Date.now(),amount:amount,type:type,note:note};if(taskId)e.taskId=taskId;return e;}
+function fid(){return session.familyId;}
+function kidLink(code){return location.href.split("#")[0]+"#/kid?f="+encodeURIComponent(code);}
+async function act(fn,okMsg){try{await fn();if(okMsg)toast(okMsg);return true;}catch(e){console.error(e);toast(friendly(e));return false;}}
 
+/* ---------- routing ---------- */
+function parseRoute(){var h=location.hash.replace(/^#\/?/,"");var parts=h.split("?");return {path:parts[0]||"",params:new URLSearchParams(parts[1]||"")};}
+function go(path){if(location.hash==="#/"+path)render();else location.hash="#/"+path;}
+function guard(){
+  if(session===undefined)return;
+  var r=parseRoute(),p=r.path,target=null;
+  if(session&&session.role==="parent"){if(p===""||p==="login"||p==="register")target="parent";}
+  else if(session&&session.role==="kid"){if(p!=="me")target="me";}
+  else if(session&&!session.role){if(p!=="register")target="register";}
+  else if(p==="parent"||p==="me")target="";
+  if(target!==null&&target!==p){history.replaceState(null,"","#/"+target);}
+}
+function setSession(s){
+  session=s;if(unwatch){unwatch();unwatch=null;}fam=null;ledger=[];famErr=null;
+  if(s&&s.role&&s.familyId){unwatch=store.watchFamily(s.familyId,function(d,e){if(e){console.error(e);famErr=e;}else if(d){fam=d.fam;ledger=d.ledger;famErr=null;try{localStorage.setItem(LAST_FAMILY,fam.code);}catch(x){}}else famErr=err("not-found");render();});}
+  guard();render();
+}
+window.addEventListener("hashchange",function(){guard();render();});
+
+/* ---------- layout ---------- */
 function nav(){
-  var n=document.getElementById("nav");
-  document.getElementById("familyName").textContent=state.family?("· "+state.family):"";
-  if(!state.pin){n.innerHTML="";return;}
-  var h='<button class="btn '+(ui.view==="kids"?"":"outline")+' sm" data-action="go-kids" aria-current="'+(ui.view==="kids"?"page":"false")+'">Kids</button>';
-  h+='<button class="btn '+(ui.view==="parent"?"":"outline")+' sm" data-action="go-parent" aria-current="'+(ui.view==="parent"?"page":"false")+'">Parent panel</button>';
-  if(ui.unlocked)h+='<button class="btn ghost sm" data-action="lock">Lock</button>';
-  n.innerHTML=h;
+  var n=document.getElementById("nav"),r=parseRoute().path;
+  document.getElementById("familyName").textContent=fam&&session?"\u00b7 "+fam.name:"";
+  if(session===undefined){n.innerHTML="";return;}
+  if(session&&session.role==="parent")n.innerHTML='<span class="small muted hide-sm">'+esc(session.name||session.email)+'</span><button class="btn ghost sm" data-action="logout">Log out</button>';
+  else if(session&&session.role==="kid")n.innerHTML='<button class="btn outline sm" data-action="logout">Log out</button>';
+  else if(session)n.innerHTML='<button class="btn ghost sm" data-action="logout">Log out</button>';
+  else n.innerHTML='<button class="btn sm '+(r==="kid"?"":"outline")+'" data-action="go" data-to="kid">Kid login</button><button class="btn sm '+(r==="login"?"":"outline")+'" data-action="go" data-to="login">Parent login</button><button class="btn sm '+(r==="register"?"":"outline")+'" data-action="go" data-to="register">Register</button>';
 }
-
-function banner(){
-  if(loadProblem)return '<div class="alert" role="alert">Saved data in this browser couldn\'t be read, so it was left untouched. Changes you make now won\'t be saved. You can restore a backup from Parent panel → Settings.</div>';
-  if(!storageOK)return '<div class="alert" role="alert">This browser isn\'t letting the site save data. Your changes will be lost when you close the page.</div>';
-  return "";
-}
-
+function demoNote(){return store.mode==="demo"?'<div class="alert small" role="note"><strong>Demo mode:</strong> accounts and data are saved only in this browser. To let parents and kids log in from their own phones and tablets, connect the free Firebase backend (see the README).</div>':"";}
 function render(){
   nav();
-  if(!state.pin){app.innerHTML=banner()+viewSetup();return;}
-  app.innerHTML=banner()+(ui.view==="parent"&&ui.unlocked?viewParent():viewKids());
+  if(session===undefined){app.innerHTML='<div class="loading">Loading\u2026</div>';return;}
+  var r=parseRoute(),h;
+  switch(r.path){
+    case "register":h=vRegister();break;
+    case "login":h=vLogin();break;
+    case "kid":h=vKidLogin(r.params);break;
+    case "parent":h=vParentWrap();break;
+    case "me":h=vMe();break;
+    default:h=vHome();
+  }
+  app.innerHTML=h;
 }
 
-/* ---------- setup ---------- */
-function viewSetup(){
-  return '<div class="hero card"><h1>Welcome!</h1><p class="muted">Set up your family. The parent PIN keeps the Parent panel for grown-ups.</p>'+
-  '<form class="stack" data-form="setup" novalidate>'+
-  '<label class="f">Family name<input type="text" name="family" maxlength="40" required autocomplete="off"></label>'+
-  '<label class="f">Parent PIN (4–8 digits)<input type="password" name="pin" inputmode="numeric" maxlength="8" autocomplete="new-password" required></label>'+
-  '<label class="f">Repeat PIN<input type="password" name="pin2" inputmode="numeric" maxlength="8" autocomplete="new-password" required></label>'+
-  '<label class="checks"><label><input type="checkbox" name="defaults" checked> Start with suggested tasks and rewards</label></label>'+
-  '<p class="err" id="setupErr" role="alert"></p>'+
-  '<button class="btn" type="submit">Create family</button></form></div>';
+/* ---------- public pages ---------- */
+function vHome(){
+  return demoNote()+'<h1 style="font-size:2rem">Chores, points and rewards for the whole family</h1><p class="lead muted">Kids tick off their daily tasks to earn points. Parents set the tasks and rewards, and add or take away points for behaviour.</p>'+
+  '<div class="home"><section class="card" aria-labelledby="hp"><h2 id="hp" style="margin:0">For parents</h2><p class="muted" style="margin:0">Register your family, create logins for your kids and manage tasks, rewards and points.</p><div class="row" style="margin-block-start:auto"><button class="btn" data-action="go" data-to="register">Register your family</button><button class="btn outline" data-action="go" data-to="login">Parent login</button></div></section>'+
+  '<section class="card" aria-labelledby="hk"><h2 id="hk" style="margin:0">For kids</h2><p class="muted" style="margin:0">Log in with your family code, username and password to tick off today\'s tasks.</p><div class="row" style="margin-block-start:auto"><button class="btn" data-action="go" data-to="kid">Kid login</button></div></section></div>'+
+  '<h2 style="margin-block-start:32px">How it works</h2><ol class="steps clean">'+
+  [["Register","A parent registers the family and gets a family code."],["Add kids","In the Parent panel, add each child and give them a username and password."],["Kids log in","Kids open the Kid login page on their own device and tick off tasks."],["Rewards","Points add up toward rewards. Parents can add or deduct points any time."]].map(function(s,i){return '<li class="card row" style="align-items:flex-start;flex-wrap:nowrap"><span class="num">'+(i+1)+'</span><div><strong>'+s[0]+'</strong><div class="small muted">'+s[1]+'</div></div></li>';}).join("")+'</ol>';
+}
+function vRegister(){
+  var finishing=session&&!session.role;
+  var h=demoNote()+'<div class="hero card" style="margin-block-start:10px"><h1>Register your family</h1><p class="muted">'+(finishing?"You're signed in as "+esc(session.email)+". Finish setting up your family.":"Create the parent account that manages your family.")+'</p><form class="stack" data-form="register" novalidate>'+
+  '<label class="f">Family name<input type="text" name="familyName" maxlength="40" required autocomplete="off" placeholder="e.g. The Abudayyeh family"></label>'+
+  '<label class="f">Your name<input type="text" name="parentName" maxlength="40" required autocomplete="name"></label>';
+  if(!finishing)h+='<label class="f">Email<input type="email" name="email" maxlength="120" required autocomplete="email"></label><label class="f">Password (at least 6 characters)<input type="password" name="password" maxlength="100" required autocomplete="new-password"></label><label class="f">Repeat password<input type="password" name="password2" maxlength="100" required autocomplete="new-password"></label>';
+  h+='<div class="checks"><label><input type="checkbox" name="defaults" checked> Start with suggested tasks and rewards</label></div><p class="err" id="formErr" role="alert"></p><button class="btn" type="submit">Create family</button></form>';
+  if(!finishing)h+='<p class="small muted" style="margin-block-end:0">Already registered? <button class="linkbtn" data-action="go" data-to="login">Log in</button></p>';
+  return h+'</div>';
+}
+function vLogin(){
+  return demoNote()+'<div class="hero card" style="margin-block-start:10px"><h1>Parent login</h1><form class="stack" data-form="login" novalidate style="margin-block-start:14px">'+
+  '<label class="f">Email<input type="email" name="email" maxlength="120" required autocomplete="email"></label><label class="f">Password<input type="password" name="password" maxlength="100" required autocomplete="current-password"></label>'+
+  '<p class="err" id="formErr" role="alert"></p><button class="btn" type="submit">Log in</button></form>'+
+  '<p class="small muted" style="margin-block-end:0"><button class="linkbtn" data-action="forgot">Forgot password?</button> \u00b7 New here? <button class="linkbtn" data-action="go" data-to="register">Register your family</button></p></div>';
+}
+function vKidLogin(params){
+  var code=(params.get("f")||"").toUpperCase();if(!code){try{code=localStorage.getItem(LAST_FAMILY)||"";}catch(e){}}
+  var h=demoNote();
+  if(session&&session.role==="parent")h+='<div class="alert small">You\'re logged in as a parent. Logging in as a kid on this device will log you out.</div>';
+  return h+'<div class="kidhero card"><div class="row" style="justify-content:center"><span class="logo" aria-hidden="true" style="inline-size:52px;block-size:52px"><svg viewBox="0 0 24 24" style="inline-size:30px;block-size:30px"><path d="M12 3.5l2.4 5 5.4.6-4 3.7 1.1 5.4L12 15.5l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/></svg></span></div><h1 style="text-align:center;margin-block:10px 4px">Hi there! Let\'s log in</h1><p class="muted" style="text-align:center;margin-block-start:0">Ask your parent for your family code, username and password.</p>'+
+  '<form class="stack" data-form="kidlogin" novalidate><label class="f">Family code<input type="text" name="code" maxlength="6" value="'+esc(code)+'" autocomplete="off" autocapitalize="characters" spellcheck="false" required></label>'+
+  '<label class="f">Username<input type="text" name="username" maxlength="20" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>'+
+  '<label class="f">Password<input type="password" name="password" maxlength="30" autocomplete="current-password" required></label><p class="err" id="formErr" role="alert"></p><button class="btn" type="submit">Let\'s go!</button></form></div>';
 }
 
-/* ---------- kids view ---------- */
+/* ---------- kid dashboard ---------- */
 function rewardPath(kid,bal){
-  var rs=state.rewards.slice().sort(function(a,b){return a.cost-b.cost;});
+  var rs=fam.rewards.slice().sort(function(a,b){return a.cost-b.cost;});
   var max=Math.max.apply(null,[bal,50].concat(rs.map(function(r){return r.cost;})));
-  var W=460,x0=24,x1=W-24,y=80;
-  function X(v){return x0+(x1-x0)*Math.max(0,v)/max;}
+  var W=460,x0=24,x1=W-24,y=80;function X(v){return x0+(x1-x0)*Math.max(0,v)/max;}
   var bx=X(bal);
   var desc=kid.name+" has "+bal+" points. "+(rs.length?rs.map(function(r){return r.title+": "+r.cost+" points, "+(bal>=r.cost?"reached":(r.cost-bal)+" to go");}).join("; "):"No rewards set.");
   var s='<svg viewBox="0 0 '+W+' 160" width="100%" role="img" aria-labelledby="rpT rpD"><title id="rpT">'+esc(kid.name)+"'s reward path</title><desc id=\"rpD\">"+esc(desc)+'</desc>';
   s+='<line x1="'+x0+'" y1="'+y+'" x2="'+x1+'" y2="'+y+'" stroke="var(--soft)" stroke-width="14" stroke-linecap="round"/>';
   if(bal>0)s+='<line x1="'+x0+'" y1="'+y+'" x2="'+bx+'" y2="'+y+'" stroke="var(--primary)" stroke-width="14" stroke-linecap="round"/>';
-  rs.forEach(function(r,i){
-    var rx=X(r.cost),ok=bal>=r.cost,above=i%2===0;
-    var lbl=r.title.length>18?r.title.slice(0,17)+"\u2026":r.title;
-    var anchor=rx>W-70?"end":rx<70?"start":"middle";
+  rs.forEach(function(r,i){var rx=X(r.cost),ok=bal>=r.cost,above=i%2===0;var lbl=r.title.length>18?r.title.slice(0,17)+"\u2026":r.title;var anchor=rx>W-70?"end":rx<70?"start":"middle";
     s+='<circle cx="'+rx+'" cy="'+y+'" r="16" stroke-width="3" fill="'+(ok?"var(--gold-mark)":"var(--card)")+'" stroke="'+(ok?"var(--gold)":"var(--border)")+'"/>';
     s+='<text x="'+rx+'" y="'+(y+4)+'" text-anchor="middle" font-size="12" font-weight="700" fill="'+(ok?"#3b2004":"var(--fg)")+'">'+r.cost+'</text>';
-    s+='<text x="'+rx+'" y="'+(above?y-26:y+38)+'" text-anchor="'+anchor+'" font-size="13" fill="var(--fg)">'+esc(lbl)+'</text>';
-  });
+    s+='<text x="'+rx+'" y="'+(above?y-26:y+38)+'" text-anchor="'+anchor+'" font-size="13" fill="var(--fg)">'+esc(lbl)+'</text>';});
   s+='<circle cx="'+bx+'" cy="'+y+'" r="9" fill="var(--primary)" stroke="var(--card)" stroke-width="3"/>';
   s+='<text x="'+bx+'" y="154" text-anchor="'+(bx>W-60?"end":bx<60?"start":"middle")+'" font-size="14" font-weight="700" fill="var(--fg)">'+esc(kid.name)+': '+bal+'</text></svg>';
   var next=rs.find(function(r){return r.cost>bal;});
   var cap=next?'<strong>'+(next.cost-bal)+' points</strong> to '+esc(next.title):(rs.length?'<strong>Every reward reached!</strong>':'No rewards yet');
   return '<figure>'+s+'<figcaption class="small">'+cap+'</figcaption></figure>';
 }
-
-function viewKids(){
-  if(!state.kids.length)return '<div class="card empty"><h1>No kids registered yet</h1><p>Open the Parent panel to register your children.</p><button class="btn" data-action="go-parent">Open Parent panel</button></div>';
-  var kid=kidById(ui.kidId)||state.kids[0];ui.kidId=kid.id;
+function famGate(){
+  if(famErr)return '<div class="card empty"><h1>Couldn\'t load your family</h1><p>'+esc(famErr.code==="not-found"?"This family no longer exists.":friendly(famErr))+'</p><button class="btn" data-action="logout">Log out</button></div>';
+  if(!fam)return '<div class="loading">Loading your family\u2026</div>';
+  return null;
+}
+function vMe(){
+  var g=famGate();if(g)return g;
+  var kid=kidById(session.kidId);
+  if(!kid)return '<div class="card empty"><h1>Account not found</h1><p>Ask a parent to check your login.</p><button class="btn" data-action="logout">Log out</button></div>';
   var bal=balance(kid.id),list=tasksFor(kid.id),today=dkey();
   var done=list.filter(function(t){return doneToday(kid.id,t.id);}).length;
-  var todayPts=state.ledger.filter(function(e){return e.kidId===kid.id&&e.date===today&&e.amount>0;}).reduce(function(s,e){return s+e.amount;},0);
-  var h='<div class="kidpick" role="group" aria-label="Choose child">';
-  state.kids.forEach(function(k){h+='<button class="kidbtn" data-action="pick-kid" data-id="'+k.id+'" aria-pressed="'+(k.id===kid.id)+'">'+avatar(k)+esc(k.name)+' <span class="muted">· '+balance(k.id)+'</span></button>';});
-  h+='</div>';
-  h+='<div class="score"><div class="row">'+avatar(kid,"lg")+'<div><h1>'+esc(kid.name)+'</h1><div><span class="big">'+bal+'</span> points</div></div></div>';
-  h+='<div style="flex:1;min-inline-size:220px;max-inline-size:380px"><div class="row" style="justify-content:space-between;margin-block-end:6px"><strong>Today</strong><span>'+done+'/'+list.length+' tasks · '+fmt(todayPts)+' pts</span></div>';
+  var todayPts=ledger.filter(function(e){return e.kidId===kid.id&&e.date===today&&e.amount>0;}).reduce(function(s,e){return s+e.amount;},0);
+  var h='<div class="score"><div class="row">'+avatar(kid,"lg")+'<div><h1>Hi, '+esc(kid.name)+'!</h1><div><span class="big">'+bal+'</span> points</div></div></div>';
+  h+='<div style="flex:1;min-inline-size:220px;max-inline-size:380px"><div class="row" style="justify-content:space-between;margin-block-end:6px"><strong>Today</strong><span>'+done+'/'+list.length+' tasks \u00b7 '+fmt(todayPts)+' pts</span></div>';
   h+='<div class="bar" role="progressbar" aria-label="Today\'s tasks completed" aria-valuemin="0" aria-valuemax="'+list.length+'" aria-valuenow="'+done+'"><span style="inline-size:'+(list.length?done/list.length*100:0)+'%"></span></div></div></div>';
   h+='<div class="grid2"><section class="card" aria-labelledby="tH"><h2 id="tH">Today\'s tasks</h2>';
-  if(!list.length)h+='<p class="muted">No tasks yet.</p>';
+  if(!list.length)h+='<p class="muted">No tasks yet. Ask a parent to add some.</p>';
   else{h+='<ul class="clean">';list.forEach(function(t){var d=!!doneToday(kid.id,t.id);
-    h+='<li><button class="task" data-action="toggle-task" data-id="'+t.id+'" aria-pressed="'+d+'"><span class="tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="t">'+esc(t.title)+'</span><span class="sr">'+(d?"done":"not done")+'</span><span class="pill">+'+t.points+'</span></button></li>';});
-  h+='</ul>';}
+    h+='<li><button class="task" data-action="toggle-task" data-id="'+t.id+'" aria-pressed="'+d+'"'+(ui.pending[t.id]?" disabled":"")+'><span class="tick" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="t">'+esc(t.title)+'</span><span class="sr">'+(d?"done":"not done")+'</span><span class="pill">+'+t.points+'</span></button></li>';});h+='</ul>';}
   h+='</section><section class="card" aria-labelledby="rH"><h2 id="rH">Rewards</h2>'+rewardPath(kid,bal)+'<ul class="clean list" style="margin-block-start:12px">';
-  state.rewards.slice().sort(function(a,b){return a.cost-b.cost;}).forEach(function(r){var ok=bal>=r.cost;
-    h+='<li><div class="grow"><div class="trunc"><strong>'+esc(r.title)+'</strong></div><div class="small">'+r.cost+' pts '+(ok?'<span class="pill b-reward">Ready — ask a parent!</span>':'· '+(r.cost-bal)+' to go')+'</div></div></li>';});
+  fam.rewards.slice().sort(function(a,b){return a.cost-b.cost;}).forEach(function(r){var ok=bal>=r.cost;
+    h+='<li><div class="grow"><div class="trunc"><strong>'+esc(r.title)+'</strong></div><div class="small">'+r.cost+' pts '+(ok?'<span class="pill b-reward">Ready \u2014 ask a parent!</span>':'\u00b7 '+(r.cost-bal)+' to go')+'</div></div></li>';});
   h+='</ul></section></div>';
-  var hist=state.ledger.filter(function(e){return e.kidId===kid.id;}).sort(function(a,b){return b.ts-a.ts;}).slice(0,8);
-  h+='<section class="card" style="margin-block-start:20px" aria-labelledby="hH"><h2 id="hH">Recent points</h2>'+histList(hist,false)+'</section>';
-  return h;
+  var hist=ledger.filter(function(e){return e.kidId===kid.id;}).slice(0,10);
+  return h+'<section class="card" style="margin-block-start:20px" aria-labelledby="hH"><h2 id="hH">My recent points</h2>'+histList(hist,false)+'</section>';
 }
-
 function histList(items,canDelete,showKid){
   if(!items.length)return '<p class="muted">No points yet.</p>';
   var h='<ul class="clean list">';
   items.forEach(function(e){var k=kidById(e.kidId);
-    h+='<li><span class="pill b-'+e.type+'" style="min-inline-size:5.6em;text-align:center">'+TYPE_LABEL[e.type]+'</span>'+(showKid&&k?avatar(k,"sm"):"")+'<div class="grow"><div class="trunc"><strong>'+esc(e.note)+'</strong></div><div class="small muted">'+(showKid&&k?esc(k.name)+" · ":"")+dayLabel(e.date)+'</div></div><span class="amt '+(e.amount<0?"neg":"pos")+'">'+fmt(e.amount)+'</span>'+
+    h+='<li><span class="pill b-'+e.type+'" style="min-inline-size:5.6em;text-align:center">'+TYPE_LABEL[e.type]+'</span>'+(showKid&&k?avatar(k,"sm"):"")+'<div class="grow"><div class="trunc"><strong>'+esc(e.note)+'</strong></div><div class="small muted">'+(showKid&&k?esc(k.name)+" \u00b7 ":"")+dayLabel(e.date)+'</div></div><span class="amt '+(e.amount<0?"neg":"pos")+'">'+fmt(e.amount)+'</span>'+
     (canDelete?'<button class="btn ghost icon" data-action="del-entry" data-id="'+e.id+'" aria-label="Delete entry: '+esc(e.note)+'">'+trashIcon()+'</button>':"")+'</li>';});
   return h+'</ul>';
 }
-function trashIcon(){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>';}
-function editIcon(){return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';}
 
 /* ---------- parent panel ---------- */
-var TABS=[["overview","Overview"],["kids","Kids"],["tasks","Tasks"],["rewards","Rewards"],["history","History"],["settings","Settings"]];
-function viewParent(){
-  var h='<h1 style="margin-block-end:14px">Parent panel</h1><div class="tabs" role="tablist" aria-label="Parent panel sections">';
-  TABS.forEach(function(t){h+='<button class="tab" role="tab" id="tab-'+t[0]+'" aria-controls="panel" aria-selected="'+(ui.tab===t[0])+'" data-action="tab" data-id="'+t[0]+'">'+t[1]+'</button>';});
+var TABS=[["overview","Overview"],["kids","Kids & logins"],["tasks","Tasks"],["rewards","Rewards"],["history","History"],["family","Family & account"]];
+function vParentWrap(){
+  if(!session||session.role!=="parent")return vLogin();
+  var g=famGate();if(g)return g;
+  var h=demoNote()+'<h1 style="margin-block-end:14px">Parent panel</h1><div class="tabs" role="tablist" aria-label="Parent panel sections">';
+  TABS.forEach(function(t){h+='<button class="tab" role="tab" id="tab-'+t[0]+'" aria-controls="panel" aria-selected="'+(ui.tab===t[0])+'" tabindex="'+(ui.tab===t[0]?0:-1)+'" data-action="tab" data-id="'+t[0]+'">'+t[1]+'</button>';});
   h+='</div><div id="panel" role="tabpanel" aria-labelledby="tab-'+ui.tab+'">';
-  h+=({overview:pOverview,kids:pKids,tasks:pTasks,rewards:pRewards,history:pHistory,settings:pSettings})[ui.tab]();
+  h+=({overview:pOverview,kids:pKids,tasks:pTasks,rewards:pRewards,history:pHistory,family:pFamily})[ui.tab]();
   return h+'</div>';
 }
-
 function weekBars(kidId){
   var days=[],max=1;
   for(var i=6;i>=0;i--){var d=new Date();d.setDate(d.getDate()-i);var k=dkey(d);
-    var v=state.ledger.filter(function(e){return e.kidId===kidId&&e.date===k&&e.amount>0;}).reduce(function(s,e){return s+e.amount;},0);
+    var v=ledger.filter(function(e){return e.kidId===kidId&&e.date===k&&e.amount>0;}).reduce(function(s,e){return s+e.amount;},0);
     max=Math.max(max,v);days.push([d.toLocaleDateString(undefined,{weekday:"narrow"}),v,d.toLocaleDateString(undefined,{weekday:"long"})]);}
   var h='<div class="small"><strong>Points earned, last 7 days</strong></div><div class="week" aria-hidden="true">';
   days.forEach(function(d){h+='<div><b>'+d[1]+'</b><i style="block-size:'+(d[1]/max*48)+'px"></i></div>';});
@@ -341,229 +524,263 @@ function weekBars(kidId){
   h+='</div><ul class="sr">';days.forEach(function(d){h+='<li>'+esc(d[2])+': '+d[1]+' points</li>';});
   return h+'</ul>';
 }
-
 function pOverview(){
-  if(!state.kids.length)return '<div class="card empty"><p>Register your children to get started.</p><button class="btn" data-action="kid-add">Register a child</button></div>';
+  if(!fam.kids.length)return '<div class="card empty"><p>Add your children and create their logins to get started.</p><button class="btn" data-action="kid-add">Add a child</button></div>';
   var h='<div class="kidcards">';
-  state.kids.forEach(function(k){
+  fam.kids.forEach(function(k){
     var b=balance(k.id),list=tasksFor(k.id),done=list.filter(function(t){return doneToday(k.id,t.id);}).length;
     h+='<section class="card" aria-label="'+esc(k.name)+'"><div class="row">'+avatar(k)+'<div class="grow"><h3>'+esc(k.name)+'</h3><div class="small">'+done+'/'+list.length+' tasks today</div></div><div class="big" style="font-size:1.7rem">'+b+'</div></div>';
-    h+=weekBars(k.id);
-    h+='<div class="quick">';QUICK.forEach(function(q){h+='<button class="btn outline sm" data-action="quick" data-id="'+k.id+'" data-amt="'+q[1]+'" data-note="'+esc(q[0])+'" style="justify-content:space-between"><span>'+q[0]+'</span><span class="pill '+(q[1]>0?"b-bonus":"b-deduction")+'">'+fmt(q[1])+'</span></button>';});
-    h+='</div><div class="row"><button class="btn sm" data-action="adjust" data-id="'+k.id+'">Add / deduct points…</button><button class="btn outline sm" data-action="redeem-pick" data-id="'+k.id+'">Redeem reward…</button></div></section>';
-  });
+    h+=weekBars(k.id)+'<div class="quick">';
+    QUICK.forEach(function(q){h+='<button class="btn outline sm" data-action="quick" data-id="'+k.id+'" data-amt="'+q[1]+'" data-note="'+esc(q[0])+'" style="justify-content:space-between"><span>'+q[0]+'</span><span class="pill '+(q[1]>0?"b-bonus":"b-deduction")+'">'+fmt(q[1])+'</span></button>';});
+    h+='</div><div class="row"><button class="btn sm" data-action="adjust" data-id="'+k.id+'">Add / deduct points\u2026</button><button class="btn outline sm" data-action="redeem-pick" data-id="'+k.id+'">Redeem reward\u2026</button></div></section>';});
   return h+'</div>';
 }
-
 function pKids(){
-  var h='<div class="card"><div class="row" style="justify-content:space-between;margin-block-end:8px"><h2 style="margin:0">Registered kids</h2><button class="btn sm" data-action="kid-add">Register a child</button></div>';
-  if(!state.kids.length)return h+'<p class="muted">No kids registered yet.</p></div>';
+  var h='<div class="card"><div class="row" style="justify-content:space-between;margin-block-end:4px"><h2 style="margin:0">Kids & their logins</h2><button class="btn sm" data-action="kid-add">Add a child</button></div>';
+  h+='<p class="small muted">Kids log in on the Kid login page with family code <strong>'+esc(fam.code)+'</strong>, their username and password.</p>';
+  if(!fam.kids.length)return h+'<p class="muted">No kids yet.</p></div>';
   h+='<ul class="clean list">';
-  state.kids.forEach(function(k){h+='<li>'+avatar(k)+'<div class="grow"><strong>'+esc(k.name)+'</strong><div class="small muted">'+(k.age?esc(k.age)+" years · ":"")+balance(k.id)+' points</div></div><button class="btn ghost icon" data-action="kid-edit" data-id="'+k.id+'" aria-label="Edit '+esc(k.name)+'">'+editIcon()+'</button><button class="btn ghost icon" data-action="kid-del" data-id="'+k.id+'" aria-label="Remove '+esc(k.name)+'">'+trashIcon()+'</button></li>';});
+  fam.kids.forEach(function(k){
+    h+='<li>'+avatar(k)+'<div class="grow"><strong>'+esc(k.name)+'</strong><div class="small muted">'+(k.age?esc(k.age)+" years \u00b7 ":"")+balance(k.id)+' points</div><div class="small" style="margin-block-start:3px">'+(k.username?'<span class="tag ok">Username: '+esc(k.username)+'</span>':'<span class="tag">No login yet</span>')+'</div></div>'+
+    '<button class="btn outline sm" data-action="kid-login" data-id="'+k.id+'">'+keyIcon()+(k.username?"Reset login":"Create login")+'</button>'+
+    '<button class="btn ghost icon" data-action="kid-edit" data-id="'+k.id+'" aria-label="Edit '+esc(k.name)+'">'+editIcon()+'</button><button class="btn ghost icon" data-action="kid-del" data-id="'+k.id+'" aria-label="Remove '+esc(k.name)+'">'+trashIcon()+'</button></li>';});
   return h+'</ul></div>';
 }
-
 function pTasks(){
   var h='<div class="card"><div class="row" style="justify-content:space-between;margin-block-end:8px"><h2 style="margin:0">Daily tasks</h2><button class="btn sm" data-action="task-add">Add task</button></div>';
-  if(!state.tasks.length)return h+'<p class="muted">No tasks yet.</p></div>';
+  if(!fam.tasks.length)return h+'<p class="muted">No tasks yet.</p></div>';
   h+='<ul class="clean list">';
-  state.tasks.forEach(function(t){var who=t.kidIds.length?t.kidIds.map(function(id){var k=kidById(id);return k?k.name:null;}).filter(Boolean).join(", "):"All kids";
+  fam.tasks.forEach(function(t){var who=t.kidIds.length?t.kidIds.map(function(i){var k=kidById(i);return k?k.name:null;}).filter(Boolean).join(", "):"All kids";
     h+='<li><span class="pill">+'+t.points+'</span><div class="grow"><strong>'+esc(t.title)+'</strong><div class="small muted">'+esc(who||"All kids")+'</div></div><button class="btn ghost icon" data-action="task-edit" data-id="'+t.id+'" aria-label="Edit '+esc(t.title)+'">'+editIcon()+'</button><button class="btn ghost icon" data-action="task-del" data-id="'+t.id+'" aria-label="Delete '+esc(t.title)+'">'+trashIcon()+'</button></li>';});
   return h+'</ul></div>';
 }
-
 function pRewards(){
   var h='<div class="card"><div class="row" style="justify-content:space-between;margin-block-end:8px"><h2 style="margin:0">Rewards</h2><button class="btn sm" data-action="reward-add">Add reward</button></div>';
-  if(!state.rewards.length)return h+'<p class="muted">No rewards yet.</p></div>';
+  if(!fam.rewards.length)return h+'<p class="muted">No rewards yet.</p></div>';
   h+='<ul class="clean list">';
-  state.rewards.slice().sort(function(a,b){return a.cost-b.cost;}).forEach(function(r){
+  fam.rewards.slice().sort(function(a,b){return a.cost-b.cost;}).forEach(function(r){
     h+='<li><span class="pill b-reward">'+r.cost+' pts</span><div class="grow"><strong>'+esc(r.title)+'</strong></div><button class="btn ghost icon" data-action="reward-edit" data-id="'+r.id+'" aria-label="Edit '+esc(r.title)+'">'+editIcon()+'</button><button class="btn ghost icon" data-action="reward-del" data-id="'+r.id+'" aria-label="Delete '+esc(r.title)+'">'+trashIcon()+'</button></li>';});
   return h+'</ul></div>';
 }
-
 function pHistory(){
-  var items=state.ledger.filter(function(e){return ui.histKid==="all"||e.kidId===ui.histKid;}).sort(function(a,b){return b.ts-a.ts;});
+  var items=ledger.filter(function(e){return ui.histKid==="all"||e.kidId===ui.histKid;});
   var shown=ui.showAll?items:items.slice(0,25);
   var h='<div class="card"><div class="row" style="justify-content:space-between;margin-block-end:8px"><h2 style="margin:0">Points history</h2><label class="row small" style="font-weight:600">Child <select data-change="hist-kid" style="inline-size:auto"><option value="all">All kids</option>';
-  state.kids.forEach(function(k){h+='<option value="'+k.id+'"'+(ui.histKid===k.id?" selected":"")+'>'+esc(k.name)+'</option>';});
-  h+='</select></label></div><p class="small muted">'+items.length+' entries. Deleting an entry reverses its points.</p>'+histList(shown,true,true);
+  fam.kids.forEach(function(k){h+='<option value="'+k.id+'"'+(ui.histKid===k.id?" selected":"")+'>'+esc(k.name)+'</option>';});
+  h+='</select></label></div><p class="small muted">'+items.length+' recent entries. Deleting an entry reverses its points.</p>'+histList(shown,true,true);
   if(items.length>25)h+='<button class="btn ghost sm" data-action="hist-more" aria-expanded="'+ui.showAll+'">'+(ui.showAll?"Show fewer":"Show all "+items.length)+'</button>';
   return h+'</div>';
 }
-
-function pSettings(){
-  return '<div class="kidcards">'+
-  '<section class="card"><h2>Family</h2><form class="stack" data-form="family"><label class="f">Family name<input type="text" name="family" maxlength="40" value="'+esc(state.family)+'" required></label><button class="btn" type="submit">Save</button></form></section>'+
-  '<section class="card"><h2>Change parent PIN</h2><form class="stack" data-form="pin" novalidate><label class="f">Current PIN<input type="password" name="cur" inputmode="numeric" maxlength="8" autocomplete="current-password"></label><label class="f">New PIN (4–8 digits)<input type="password" name="pin" inputmode="numeric" maxlength="8" autocomplete="new-password"></label><label class="f">Repeat new PIN<input type="password" name="pin2" inputmode="numeric" maxlength="8" autocomplete="new-password"></label><p class="err" id="pinErr" role="alert"></p><button class="btn" type="submit">Change PIN</button></form></section>'+
-  '<section class="card"><h2>Backup</h2><p class="small">Everything is stored in this browser. Download a backup to keep it safe or move it to another device.</p><div class="row"><button class="btn" data-action="export">Download backup</button><label class="btn outline" tabindex="0" data-action="import-trigger">Restore backup<input type="file" id="importFile" accept="application/json,.json" class="sr"></label></div></section>'+
-  '<section class="card"><h2>Start over</h2><p class="small">Deletes the family, kids, tasks, rewards and all points history from this browser.</p><button class="btn danger" data-action="reset">Delete all data</button></section>'+
-  '</div>';
+function pFamily(){
+  var link=kidLink(fam.code);
+  var h='<div class="kidcards">';
+  h+='<section class="card"><h2>Family code & kid login link</h2><p class="small" style="margin-block-start:0">Kids need this code to log in.</p><div class="code">'+esc(fam.code)+'</div><p class="small" style="margin-block-end:6px">Kid login link (opens with the code filled in):</p><div class="linkbox">'+esc(link)+'</div><div class="row" style="margin-block-start:10px"><button class="btn sm" data-action="copy" data-text="'+esc(link)+'">Copy link</button><button class="btn outline sm" data-action="copy" data-text="'+esc(fam.code)+'">Copy code</button></div></section>';
+  h+='<section class="card"><div class="row" style="justify-content:space-between;margin-block-end:8px"><h2 style="margin:0">Parents</h2><button class="btn sm" data-action="parent-add">Add parent</button></div><ul class="clean list">';
+  (fam.parents||[]).forEach(function(p){var me=p.uid===session.uid;
+    h+='<li><span class="avatar c3 sm" aria-hidden="true">'+esc(initial(p.name))+'</span><div class="grow"><strong>'+esc(p.name)+(me?' <span class="tag">You</span>':'')+'</strong><div class="small muted trunc">'+esc(p.email)+'</div></div>'+(me?'':'<button class="btn ghost icon" data-action="parent-del" data-id="'+esc(p.uid)+'" aria-label="Remove '+esc(p.name)+'">'+trashIcon()+'</button>')+'</li>';});
+  h+='</ul></section>';
+  h+='<section class="card"><h2>Family name</h2><p style="margin-block-start:0"><strong>'+esc(fam.name)+'</strong></p><button class="btn outline sm" data-action="rename">Rename family</button></section>';
+  h+='<section class="card"><h2>My account</h2><p class="small" style="margin-block-start:0">Logged in as <strong>'+esc(session.email)+'</strong></p><div class="row"><button class="btn outline sm" data-action="change-pw">Change password</button><button class="btn outline sm" data-action="export">Download data</button></div></section>';
+  return h+'</div>';
 }
 
 /* ---------- dialogs ---------- */
 var dlgHandler=null;
-function openDialog(title,body,onSubmit,submitLabel,danger){
+function openDialog(title,body,onSubmit,submitLabel,danger,noCancel){
   dlgHandler=onSubmit;
-  dlg.innerHTML='<form class="stack" data-form="dialog" novalidate><h2 id="dlgTitle" style="margin:0">'+esc(title)+'</h2>'+body+'<p class="err" id="dlgErr" role="alert"></p><div class="actions"><button type="button" class="btn outline" data-action="dlg-cancel">Cancel</button><button type="submit" class="btn'+(danger?" danger":"")+'">'+esc(submitLabel||"Save")+'</button></div></form>';
-  try{dlg.showModal();}catch(e){dlg.setAttribute("open","");}
-  var f=dlg.querySelector("input,select");if(f)f.focus();
+  dlg.innerHTML='<form class="stack" data-form="dialog" novalidate><h2 id="dlgTitle" style="margin:0">'+esc(title)+'</h2>'+body+'<p class="err" id="dlgErr" role="alert"></p><div class="actions">'+(noCancel?"":'<button type="button" class="btn outline" data-action="dlg-cancel">Cancel</button>')+'<button type="submit" class="btn'+(danger?" danger":"")+'">'+esc(submitLabel||"Save")+'</button></div></form>';
+  try{if(!dlg.open)dlg.showModal();}catch(e){dlg.setAttribute("open","");}
+  var f=dlg.querySelector("input:not([type=radio]):not([type=checkbox]),select,input");if(f)f.focus();else{var b=dlg.querySelector("[type=submit]");if(b)b.focus();}
 }
-function closeDialog(){dlgHandler=null;try{dlg.close();}catch(e){dlg.removeAttribute("open");}}
+function closeDialog(){dlgHandler=null;try{dlg.close();}catch(e){dlg.removeAttribute("open");}dlg.innerHTML="";}
 function dlgErr(m){var e=document.getElementById("dlgErr");if(e)e.textContent=m;}
-function confirmBox(title,msg,label,fn){openDialog(title,'<p style="margin:0">'+esc(msg)+'</p>',function(){fn();return true;},label,true);}
-function intIn(v,lo,hi){var n=Number(v);return String(v).trim()!==""&&Number.isInteger(n)&&n>=lo&&n<=hi?n:null;}
-
-function kidForm(k){
+function confirmBox(title,msg,label,fn){openDialog(title,'<p style="margin:0">'+esc(msg)+'</p>',fn,label,true);}
+function info(title,html){openDialog(title,html,function(){return true;},"Done",false,true);}
+function checkUsername(u){return /^[a-z0-9][a-z0-9.-]{1,19}$/.test(u);}
+function loginFields(k){
+  return '<label class="f">Username<input type="text" name="username" maxlength="20" value="'+esc(k&&k.username||"")+'" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="e.g. omar"></label><p class="small muted" style="margin:-6px 0 0">2\u201320 lowercase letters, numbers, dots or dashes.</p>'+
+  '<label class="f">Password<input type="text" name="kidpw" maxlength="30" autocomplete="off" spellcheck="false" placeholder="at least 4 characters"></label><p class="small muted" style="margin:-6px 0 0">Shown as you type so you can tell your child. You can reset it any time.</p>';
+}
+function loginInfo(name,username,pw){
+  var link=kidLink(fam.code);
+  info(name+" can log in now",'<p style="margin:0">Give these details to '+esc(name)+':</p><ul class="clean list"><li><span class="grow">Family code</span><strong class="code" style="font-size:1.1rem">'+esc(fam.code)+'</strong></li><li><span class="grow">Username</span><strong>'+esc(username)+'</strong></li><li><span class="grow">Password</span><strong>'+esc(pw)+'</strong></li></ul><p class="small" style="margin:0">Kid login link:</p><div class="linkbox">'+esc(link)+'</div><div class="row"><button type="button" class="btn outline sm" data-action="copy" data-text="'+esc(link)+'">Copy link</button></div>');
+}
+function readLogin(fd,required){
+  var u=String(fd.get("username")||"").trim().toLowerCase(),p=String(fd.get("kidpw")||"");
+  if(!u&&!p&&!required)return {skip:true};
+  if(!checkUsername(u)){dlgErr("Usernames are 2\u201320 lowercase letters, numbers, dots or dashes.");return null;}
+  if(p.length<4){dlgErr("The password needs at least 4 characters.");return null;}
+  return {username:u,pw:p};
+}
+function kidForm(k,withLogin){
   var h='<label class="f">Child\'s name<input type="text" name="name" maxlength="30" value="'+(k?esc(k.name):"")+'" required></label>';
   h+='<label class="f">Age (optional)<input type="number" name="age" min="1" max="18" value="'+(k&&k.age?esc(k.age):"")+'"></label>';
-  h+='<fieldset style="border:0;padding:0;margin:0"><legend class="f" style="font-weight:600;margin-block-end:6px">Colour</legend><div class="swatches">';
-  var cur=k?k.color:(state.kids.length%COLORS);
+  h+='<fieldset style="border:0;padding:0;margin:0"><legend style="font-weight:600;margin-block-end:6px">Colour</legend><div class="swatches">';
+  var cur=k?k.color:(fam.kids.length%COLORS);
   for(var i=0;i<COLORS;i++)h+='<label><input type="radio" name="color" value="'+i+'"'+(i===cur?" checked":"")+' aria-label="Colour '+(i+1)+'"><span class="avatar c'+i+'" aria-hidden="true">'+esc(initial(k?k.name:"A"))+'</span></label>';
-  return h+'</div></fieldset>';
+  h+='</div></fieldset>';
+  if(withLogin)h+='<fieldset style="border:1px solid var(--border);border-radius:12px;padding:12px;margin:0;display:grid;gap:12px"><legend style="font-weight:700;padding-inline:4px">Login for the Kid login page</legend>'+loginFields(null)+'</fieldset>';
+  return h;
 }
-function kidSubmit(k){return function(fd){
+function kidSubmit(k){return async function(fd){
   var name=String(fd.get("name")||"").trim();if(!name){dlgErr("Enter a name.");return false;}
   var ageRaw=String(fd.get("age")||"").trim(),age=ageRaw?intIn(ageRaw,1,18):null;if(ageRaw&&age===null){dlgErr("Age must be a whole number from 1 to 18.");return false;}
   var color=Number(fd.get("color")||0);
-  commit(function(s){if(k){var x=s.kids.find(function(z){return z.id===k.id;});if(x){x.name=name;x.age=age||undefined;x.color=color;}}else s.kids.push({id:uid(),name:name,age:age||undefined,color:color});},k?"Saved":name+" registered");
-  return true;};}
-
+  if(k){await store.mutate(fid(),function(d){return {kids:d.kids.map(function(x){return x.id===k.id?Object.assign({},x,{name:name,age:age,color:color}):x;})};});toast("Saved");return true;}
+  var login=readLogin(fd,true);if(!login)return false;
+  if(fam.kids.some(function(x){return x.username===login.username;})){dlgErr("That username is already used in your family. Pick another one.");return false;}
+  var nk={id:id(),name:name,age:age,color:color,username:null,uid:null};
+  await store.mutate(fid(),function(d){return {kids:d.kids.concat([nk])};});
+  try{await store.setKidLogin(fid(),nk.id,login.username,login.pw);}
+  catch(e){closeDialog();toast(name+" was added, but the login wasn't created: "+friendly(e));ui.tab="kids";render();return true;}
+  closeDialog();loginInfo(name,login.username,login.pw);return "keep";
+};}
+function kidLoginDialog(k){
+  openDialog((k.username?"Reset login for ":"Create login for ")+k.name,(k.username?'<p class="small" style="margin:0">Setting a new password replaces the old one. You can also change the username.</p>':"")+loginFields(k),
+    async function(fd){var l=readLogin(fd,true);if(!l)return false;await store.setKidLogin(fid(),k.id,l.username,l.pw);closeDialog();loginInfo(k.name,l.username,l.pw);return "keep";},k.username?"Reset login":"Create login");
+}
 function taskForm(t){
   var h='<label class="f">Task<input type="text" name="title" maxlength="60" value="'+(t?esc(t.title):"")+'" required></label><label class="f">Points<input type="number" name="points" min="1" max="1000" value="'+(t?t.points:5)+'"></label>';
-  if(state.kids.length){h+='<fieldset style="border:0;padding:0;margin:0"><legend style="font-weight:600;margin-block-end:6px">Who does this task? <span class="small muted">(none ticked = all kids)</span></legend><div class="checks">';
-    state.kids.forEach(function(k){h+='<label><input type="checkbox" name="kid" value="'+k.id+'"'+(t&&t.kidIds.indexOf(k.id)>=0?" checked":"")+'> '+esc(k.name)+'</label>';});
-    h+='</div></fieldset>';}
+  if(fam.kids.length){h+='<fieldset style="border:0;padding:0;margin:0"><legend style="font-weight:600;margin-block-end:6px">Who does this task? <span class="small muted">(none ticked = all kids)</span></legend><div class="checks">';
+    fam.kids.forEach(function(k){h+='<label><input type="checkbox" name="kid" value="'+k.id+'"'+(t&&t.kidIds.indexOf(k.id)>=0?" checked":"")+'> '+esc(k.name)+'</label>';});h+='</div></fieldset>';}
   return h;
 }
-function taskSubmit(t){return function(fd){
+function taskSubmit(t){return async function(fd){
   var title=String(fd.get("title")||"").trim(),pts=intIn(fd.get("points"),1,1000);
   if(!title){dlgErr("Enter a task name.");return false;}if(pts===null){dlgErr("Points must be a whole number from 1 to 1,000.");return false;}
   var ids=fd.getAll("kid").map(String);
-  commit(function(s){if(t){var x=s.tasks.find(function(z){return z.id===t.id;});if(x){x.title=title;x.points=pts;x.kidIds=ids;}}else s.tasks.push({id:uid(),title:title,points:pts,kidIds:ids});},t?"Task saved":"Task added");
-  return true;};}
-
+  await store.mutate(fid(),function(d){return {tasks:t?d.tasks.map(function(x){return x.id===t.id?Object.assign({},x,{title:title,points:pts,kidIds:ids}):x;}):d.tasks.concat([{id:id(),title:title,points:pts,kidIds:ids}])};});
+  toast(t?"Task saved":"Task added");return true;};}
 function rewardForm(r){return '<label class="f">Reward<input type="text" name="title" maxlength="60" value="'+(r?esc(r.title):"")+'" required></label><label class="f">Points needed<input type="number" name="cost" min="1" max="100000" value="'+(r?r.cost:50)+'"></label>';}
-function rewardSubmit(r){return function(fd){
+function rewardSubmit(r){return async function(fd){
   var title=String(fd.get("title")||"").trim(),cost=intIn(fd.get("cost"),1,100000);
   if(!title){dlgErr("Enter a reward name.");return false;}if(cost===null){dlgErr("Points must be a whole number from 1 to 100,000.");return false;}
-  commit(function(s){if(r){var x=s.rewards.find(function(z){return z.id===r.id;});if(x){x.title=title;x.cost=cost;}}else s.rewards.push({id:uid(),title:title,cost:cost});},r?"Reward saved":"Reward added");
-  return true;};}
-
+  await store.mutate(fid(),function(d){return {rewards:r?d.rewards.map(function(x){return x.id===r.id?Object.assign({},x,{title:title,cost:cost}):x;}):d.rewards.concat([{id:id(),title:title,cost:cost}])};});
+  toast(r?"Reward saved":"Reward added");return true;};}
 function adjustDialog(k){
   openDialog("Adjust "+k.name+"'s points",
     '<div class="seg" role="radiogroup" aria-label="Add or deduct"><label><input type="radio" name="type" value="bonus" checked> Add</label><label><input type="radio" name="type" value="deduction"> Deduct</label></div>'+
     '<label class="f">Points<input type="number" name="amount" min="1" max="1000" value="5"></label><label class="f">Reason<input type="text" name="note" maxlength="80" placeholder="e.g. Helped his sister"></label>',
-    function(fd){var type=fd.get("type")==="deduction"?"deduction":"bonus",n=intIn(fd.get("amount"),1,1000);
+    async function(fd){var type=fd.get("type")==="deduction"?"deduction":"bonus",n=intIn(fd.get("amount"),1,1000);
       if(n===null){dlgErr("Points must be a whole number from 1 to 1,000.");return false;}
       var amt=type==="bonus"?n:-n,note=String(fd.get("note")||"").trim()||(type==="bonus"?"Bonus points":"Points deducted");
-      commit(function(){addEntry(k.id,type,amt,note);},fmt(amt)+" points for "+k.name);return true;},"Save");
+      await store.addEntry(fid(),entry(k.id,type,amt,note));toast(fmt(amt)+" points for "+k.name);return true;},"Save");
 }
 function redeemDialog(k){
-  var bal=balance(k.id),rs=state.rewards.slice().sort(function(a,b){return a.cost-b.cost;});
+  var bal=balance(k.id),rs=fam.rewards.slice().sort(function(a,b){return a.cost-b.cost;});
   if(!rs.length){toast("Add a reward first");return;}
-  var h='<p style="margin:0">'+esc(k.name)+' has <strong>'+bal+'</strong> points.</p><fieldset style="border:0;padding:0;margin:0"><legend class="sr">Reward</legend><div class="stack" style="gap:6px">';
-  rs.forEach(function(r,i){var ok=bal>=r.cost;h+='<label class="row"><input type="radio" name="reward" value="'+r.id+'"'+(ok?"":" disabled")+(ok&&!rs.slice(0,i).some(function(z){return bal>=z.cost;})?" checked":"")+'> <span class="grow">'+esc(r.title)+'</span><span class="pill b-reward">'+r.cost+'</span>'+(ok?"":'<span class="small muted">'+(r.cost-bal)+' to go</span>')+'</label>';});
+  var first=true,h='<p style="margin:0">'+esc(k.name)+' has <strong>'+bal+'</strong> points.</p><fieldset style="border:0;padding:0;margin:0"><legend class="sr">Reward</legend><div class="stack" style="gap:6px">';
+  rs.forEach(function(r){var ok=bal>=r.cost;h+='<label class="row"><input type="radio" name="reward" value="'+r.id+'"'+(ok?"":" disabled")+(ok&&first?" checked":"")+'> <span class="grow">'+esc(r.title)+'</span><span class="pill b-reward">'+r.cost+'</span>'+(ok?"":'<span class="small muted">'+(r.cost-bal)+' to go</span>')+'</label>';if(ok)first=false;});
   h+='</div></fieldset>';
-  openDialog("Redeem a reward",h,function(fd){var id=fd.get("reward"),r=state.rewards.find(function(z){return z.id===id;});
+  openDialog("Redeem a reward",h,async function(fd){var rid=fd.get("reward"),r=fam.rewards.find(function(z){return z.id===rid;});
     if(!r){dlgErr("Pick a reward "+k.name+" has enough points for.");return false;}
     if(balance(k.id)<r.cost){dlgErr("Not enough points.");return false;}
-    commit(function(){addEntry(k.id,"reward",-r.cost,r.title);},k.name+" redeemed "+r.title);return true;},"Redeem");
+    await store.addEntry(fid(),entry(k.id,"reward",-r.cost,r.title));toast(k.name+" redeemed "+r.title);return true;},"Redeem");
 }
-function pinDialog(){
-  openDialog("Parent PIN",'<label class="f">Enter PIN<input type="password" name="pin" inputmode="numeric" maxlength="8" autocomplete="current-password"></label>',
-    function(fd){var pin=String(fd.get("pin")||"");
-      hashPin(pin,state.pin.salt).then(function(h){
-        if(h===state.pin.hash){closeDialog();ui.unlocked=true;ui.view="parent";render();app.focus();}
-        else dlgErr("That PIN isn't right.");});
-      return false;},"Unlock");
+function pwChangeDialog(){
+  openDialog("Change password",'<label class="f">Current password<input type="password" name="cur" autocomplete="current-password"></label><label class="f">New password (at least 6 characters)<input type="password" name="pw" autocomplete="new-password"></label><label class="f">Repeat new password<input type="password" name="pw2" autocomplete="new-password"></label>',
+    async function(fd){var c=String(fd.get("cur")||""),p=String(fd.get("pw")||""),p2=String(fd.get("pw2")||"");
+      if(p.length<6){dlgErr("The new password needs at least 6 characters.");return false;}if(p!==p2){dlgErr("The new passwords don't match.");return false;}
+      try{await store.changePassword(c,p);}catch(e){if(e.code==="bad-login"||e.code==="auth/wrong-password"||e.code==="auth/invalid-credential"){dlgErr("The current password isn't right.");return false;}throw e;}
+      toast("Password changed");return true;},"Change password");
+}
+function parentAddDialog(){
+  openDialog("Add a parent",'<p class="small" style="margin:0">They\'ll log in on the Parent login page with this email and password, and can change the password later.</p><label class="f">Name<input type="text" name="name" maxlength="40" required></label><label class="f">Email<input type="email" name="email" maxlength="120" required></label><label class="f">Temporary password (at least 6 characters)<input type="text" name="pw" maxlength="100" autocomplete="off" spellcheck="false"></label>',
+    async function(fd){var n=String(fd.get("name")||"").trim(),em=String(fd.get("email")||"").trim(),p=String(fd.get("pw")||"");
+      if(!n){dlgErr("Enter a name.");return false;}if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){dlgErr("Enter a valid email address.");return false;}if(p.length<6){dlgErr("The password needs at least 6 characters.");return false;}
+      await store.addParent(fid(),n,em,p);toast(n+" can now log in as a parent");return true;},"Add parent");
 }
 
 /* ---------- events ---------- */
+async function toggleTask(tid){
+  var kid=kidById(session.kidId),t=fam.tasks.find(function(z){return z.id===tid;});if(!kid||!t||ui.pending[tid])return;
+  ui.pending[tid]=true;var ex=doneToday(kid.id,t.id);
+  await act(function(){return ex?store.deleteEntry(fid(),ex):store.addEntry(fid(),entry(kid.id,"task",t.points,t.title,t.id));},ex?null:"+"+t.points+" points! Great job!");
+  delete ui.pending[tid];render();var b=app.querySelector('[data-action="toggle-task"][data-id="'+tid+'"]');if(b)b.focus();
+}
+function copyText(txt){
+  function fb(){try{var ta=document.createElement("textarea");ta.value=txt;ta.setAttribute("readonly","");ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.select();var ok=document.execCommand("copy");ta.remove();toast(ok?"Copied":"Couldn't copy \u2014 select and copy it yourself");}catch(e){toast("Couldn't copy \u2014 select and copy it yourself");}}
+  try{if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(txt).then(function(){toast("Copied");},fb);else fb();}catch(e){fb();}
+}
 document.addEventListener("click",function(ev){
   var el=ev.target.closest("[data-action]");if(!el)return;
-  var a=el.getAttribute("data-action"),id=el.getAttribute("data-id");
-  var k=id?kidById(id):null;
+  var a=el.getAttribute("data-action"),did=el.getAttribute("data-id");
+  var k=did&&fam?kidById(did):null;
   switch(a){
-    case "go-kids":ui.view="kids";render();break;
-    case "go-parent":if(ui.unlocked){ui.view="parent";render();}else pinDialog();break;
-    case "lock":ui.unlocked=false;ui.view="kids";render();toast("Parent panel locked");break;
-    case "pick-kid":ui.kidId=id;render();break;
-    case "toggle-task":{var kid=kidById(ui.kidId);var t=state.tasks.find(function(z){return z.id===id;});if(!kid||!t)break;
-      var ex=doneToday(kid.id,t.id);
-      if(ex)commit(function(s){s.ledger=s.ledger.filter(function(e){return e.id!==ex.id;});});
-      else commit(function(){addEntry(kid.id,"task",t.points,t.title,t.id);},"+"+t.points+" points for "+kid.name+"!");
-      var b=app.querySelector('[data-action="toggle-task"][data-id="'+id+'"]');if(b)b.focus();break;}
-    case "tab":ui.tab=id;ui.showAll=false;render();var tb=document.getElementById("tab-"+id);if(tb)tb.focus();break;
-    case "quick":if(k){var amt=Number(el.getAttribute("data-amt")),note=el.getAttribute("data-note");commit(function(){addEntry(k.id,amt>0?"bonus":"deduction",amt,note);},fmt(amt)+" points for "+k.name);}break;
+    case "go":go(el.getAttribute("data-to")||"");break;
+    case "home":go(session&&session.role==="parent"?"parent":session&&session.role==="kid"?"me":"");break;
+    case "logout":act(async function(){await store.logout();setSession(null);go("");},"Logged out");break;
+    case "forgot":{var em=app.querySelector('[name="email"]');var v=em?em.value.trim():"";var fe=document.getElementById("formErr");
+      if(!v){if(fe)fe.textContent="Type your email above first, then choose Forgot password.";break;}
+      store.sendReset(v).then(function(){if(fe)fe.textContent="";toast("Check your email for a reset link");},function(e){if(fe)fe.textContent=friendly(e);});break;}
+    case "toggle-task":toggleTask(did);break;
+    case "tab":ui.tab=did;ui.showAll=false;render();var tb=document.getElementById("tab-"+did);if(tb)tb.focus();break;
+    case "quick":if(k){var amt=Number(el.getAttribute("data-amt")),note=el.getAttribute("data-note");act(function(){return store.addEntry(fid(),entry(k.id,amt>0?"bonus":"deduction",amt,note));},fmt(amt)+" points for "+k.name);}break;
     case "adjust":if(k)adjustDialog(k);break;
     case "redeem-pick":if(k)redeemDialog(k);break;
-    case "kid-add":openDialog("Register a child",kidForm(null),kidSubmit(null));break;
-    case "kid-edit":if(k)openDialog("Edit child",kidForm(k),kidSubmit(k));break;
-    case "kid-del":if(k)confirmBox("Remove "+k.name+"?",k.name+" and all of their points history will be removed.","Remove",function(){commit(function(s){s.kids=s.kids.filter(function(z){return z.id!==k.id;});s.ledger=s.ledger.filter(function(e){return e.kidId!==k.id;});s.tasks.forEach(function(t){t.kidIds=t.kidIds.filter(function(x){return x!==k.id;});});},k.name+" removed");});break;
+    case "kid-add":openDialog("Add a child",kidForm(null,true),kidSubmit(null),"Add child");break;
+    case "kid-edit":if(k)openDialog("Edit child",kidForm(k,false),kidSubmit(k));break;
+    case "kid-login":if(k)kidLoginDialog(k);break;
+    case "kid-del":if(k)confirmBox("Remove "+k.name+"?",k.name+", their login and all of their points history will be removed.","Remove",async function(){await store.deleteKid(fid(),k.id);toast(k.name+" removed");return true;});break;
     case "task-add":openDialog("Add task",taskForm(null),taskSubmit(null));break;
-    case "task-edit":{var t2=state.tasks.find(function(z){return z.id===id;});if(t2)openDialog("Edit task",taskForm(t2),taskSubmit(t2));break;}
-    case "task-del":{var t3=state.tasks.find(function(z){return z.id===id;});if(t3)confirmBox("Delete "+t3.title+"?","Points already earned for this task stay in the history.","Delete",function(){commit(function(s){s.tasks=s.tasks.filter(function(z){return z.id!==t3.id;});},"Task deleted");});break;}
+    case "task-edit":{var t2=fam.tasks.find(function(z){return z.id===did;});if(t2)openDialog("Edit task",taskForm(t2),taskSubmit(t2));break;}
+    case "task-del":{var t3=fam.tasks.find(function(z){return z.id===did;});if(t3)confirmBox("Delete "+t3.title+"?","Points already earned for this task stay in the history.","Delete",async function(){await store.mutate(fid(),function(d){return {tasks:d.tasks.filter(function(z){return z.id!==t3.id;})};});toast("Task deleted");return true;});break;}
     case "reward-add":openDialog("Add reward",rewardForm(null),rewardSubmit(null));break;
-    case "reward-edit":{var r=state.rewards.find(function(z){return z.id===id;});if(r)openDialog("Edit reward",rewardForm(r),rewardSubmit(r));break;}
-    case "reward-del":{var r2=state.rewards.find(function(z){return z.id===id;});if(r2)confirmBox("Delete "+r2.title+"?","This removes the reward. Past redemptions stay in the history.","Delete",function(){commit(function(s){s.rewards=s.rewards.filter(function(z){return z.id!==r2.id;});},"Reward deleted");});break;}
-    case "del-entry":{var e=state.ledger.find(function(z){return z.id===id;});if(e){var kk=kidById(e.kidId);confirmBox("Delete this entry?",fmt(e.amount)+" points ("+e.note+") will be reversed"+(kk?" for "+kk.name:"")+".","Delete",function(){commit(function(s){s.ledger=s.ledger.filter(function(z){return z.id!==e.id;});},"Entry deleted");});}break;}
+    case "reward-edit":{var r=fam.rewards.find(function(z){return z.id===did;});if(r)openDialog("Edit reward",rewardForm(r),rewardSubmit(r));break;}
+    case "reward-del":{var r2=fam.rewards.find(function(z){return z.id===did;});if(r2)confirmBox("Delete "+r2.title+"?","This removes the reward. Past redemptions stay in the history.","Delete",async function(){await store.mutate(fid(),function(d){return {rewards:d.rewards.filter(function(z){return z.id!==r2.id;})};});toast("Reward deleted");return true;});break;}
+    case "del-entry":{var e=ledger.find(function(z){return z.id===did;});if(e){var kk=kidById(e.kidId);confirmBox("Delete this entry?",fmt(e.amount)+" points ("+e.note+") will be reversed"+(kk?" for "+kk.name:"")+".","Delete",async function(){await store.deleteEntry(fid(),e);toast("Entry deleted");return true;});}break;}
     case "hist-more":ui.showAll=!ui.showAll;render();break;
+    case "parent-add":parentAddDialog();break;
+    case "parent-del":{var p=(fam.parents||[]).find(function(z){return z.uid===did;});if(p)confirmBox("Remove "+p.name+"?",p.name+" will no longer be able to open this family's Parent panel.","Remove",async function(){await store.removeParent(fid(),p.uid);toast(p.name+" removed");return true;});break;}
+    case "rename":openDialog("Rename family",'<label class="f">Family name<input type="text" name="name" maxlength="40" value="'+esc(fam.name)+'"></label>',async function(fd){var n=String(fd.get("name")||"").trim();if(!n){dlgErr("Enter a family name.");return false;}await store.mutate(fid(),function(){return {name:n};});toast("Saved");return true;});break;
+    case "change-pw":pwChangeDialog();break;
+    case "copy":copyText(el.getAttribute("data-text")||"");break;
     case "dlg-cancel":closeDialog();break;
-    case "export":{try{var blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});var url=URL.createObjectURL(blob);var link=document.createElement("a");link.href=url;link.download="kids-chore-points-backup-"+dkey()+".json";document.body.appendChild(link);link.click();link.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);toast("Backup downloaded");}catch(err){toast("Download isn't available here");}break;}
-    case "import-trigger":if(ev.target===el){document.getElementById("importFile").click();ev.preventDefault();}break;
-    case "reset":confirmBox("Delete all data?","Everything for "+(state.family||"this family")+" will be removed from this browser. Download a backup first if you may need it.","Delete everything",function(){loadProblem=false;state=blank();ui={view:"kids",kidId:null,tab:"overview",unlocked:false,histKid:"all",showAll:false};try{localStorage.removeItem(KEY);}catch(err){}render();toast("All data deleted");});break;
+    case "export":{try{var blob=new Blob([JSON.stringify({family:fam,ledger:ledger},null,2)],{type:"application/json"});var url=URL.createObjectURL(blob);var link=document.createElement("a");link.href=url;link.download="kids-chore-points-"+fam.code+"-"+dkey()+".json";document.body.appendChild(link);link.click();link.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);toast("Data downloaded");}catch(x){toast("Download isn't available here");}break;}
   }
 });
 document.addEventListener("keydown",function(ev){
   var el=ev.target;
-  if(el.matches&&el.matches('[data-action="import-trigger"]')&&(ev.key==="Enter"||ev.key===" ")){ev.preventDefault();document.getElementById("importFile").click();}
   if(el.matches&&el.matches('[role="tab"]')&&(ev.key==="ArrowRight"||ev.key==="ArrowLeft")){
     var i=TABS.findIndex(function(t){return t[0]===ui.tab;});i=(i+(ev.key==="ArrowRight"?1:TABS.length-1))%TABS.length;ui.tab=TABS[i][0];render();document.getElementById("tab-"+ui.tab).focus();}
 });
 document.addEventListener("change",function(ev){
   var el=ev.target;
   if(el.getAttribute("data-change")==="hist-kid"){ui.histKid=el.value;ui.showAll=false;render();var s=app.querySelector('[data-change="hist-kid"]');if(s)s.focus();}
-  if(el.id==="importFile"&&el.files&&el.files[0]){
-    var rd=new FileReader();
-    rd.onload=function(){try{var d=JSON.parse(String(rd.result));if(!valid(d)||!d.pin)throw new Error("bad");
-      confirmBox("Restore this backup?","This replaces everything in this browser with the backup for "+(d.family||"your family")+".","Restore",function(){loadProblem=false;state=d;ui.unlocked=false;ui.view="kids";ui.kidId=null;var ok=save();render();toast(ok?"Backup restored":"Restored, but not saved in this browser");});
-    }catch(err){toast("That file isn't a valid backup");}};
-    rd.readAsText(el.files[0]);el.value="";
-  }
 });
-document.addEventListener("submit",function(ev){
+document.addEventListener("submit",async function(ev){
   var f=ev.target,kind=f.getAttribute("data-form");if(!kind)return;ev.preventDefault();
-  var fd=new FormData(f);
-  if(kind==="dialog"){if(dlgHandler&&dlgHandler(fd))closeDialog();return;}
-  if(kind==="setup"){
-    var fam=String(fd.get("family")||"").trim(),p=String(fd.get("pin")||""),p2=String(fd.get("pin2")||""),err=document.getElementById("setupErr");
-    if(!fam){err.textContent="Enter a family name.";return;}
-    if(!/^\d{4,8}$/.test(p)){err.textContent="The PIN must be 4 to 8 digits.";return;}
-    if(p!==p2){err.textContent="The two PINs don't match.";return;}
-    var salt=uid();
-    hashPin(p,salt).then(function(h){
-      state.family=fam;state.pin={salt:salt,hash:h};
-      if(fd.get("defaults")){state.tasks=DEFAULT_TASKS.map(function(t){return {id:uid(),title:t[0],points:t[1],kidIds:[]};});state.rewards=DEFAULT_REWARDS.map(function(r){return {id:uid(),title:r[0],cost:r[1]};});}
-      save();ui.unlocked=true;ui.view="parent";ui.tab="kids";render();
-      openDialog("Register a child",kidForm(null),kidSubmit(null));
-    });
-    return;
-  }
-  if(kind==="family"){var fn=String(fd.get("family")||"").trim();if(fn)commit(function(s){s.family=fn;},"Saved");return;}
-  if(kind==="pin"){
-    var pe=document.getElementById("pinErr"),cur=String(fd.get("cur")||""),np=String(fd.get("pin")||""),np2=String(fd.get("pin2")||"");
-    hashPin(cur,state.pin.salt).then(function(h){
-      if(h!==state.pin.hash){pe.textContent="The current PIN isn't right.";return;}
-      if(!/^\d{4,8}$/.test(np)){pe.textContent="The new PIN must be 4 to 8 digits.";return;}
-      if(np!==np2){pe.textContent="The new PINs don't match.";return;}
-      var salt2=uid();hashPin(np,salt2).then(function(h2){commit(function(s){s.pin={salt:salt2,hash:h2};},"PIN changed");});
-    });
-  }
+  var fd=new FormData(f),btn=f.querySelector('[type="submit"]');
+  if(btn&&btn.disabled)return;
+  function fail(m){var x=document.getElementById(kind==="dialog"?"dlgErr":"formErr");if(x)x.textContent=m;}
+  if(btn)btn.disabled=true;
+  try{
+    if(kind==="dialog"){if(!dlgHandler)return;var res=await dlgHandler(fd);if(res===true)closeDialog();return;}
+    if(kind==="register"){
+      var finishing=session&&!session.role;
+      var o={familyName:String(fd.get("familyName")||"").trim(),parentName:String(fd.get("parentName")||"").trim(),email:String(fd.get("email")||"").trim(),password:String(fd.get("password")||""),defaults:!!fd.get("defaults")};
+      if(!o.familyName)return fail("Enter a family name.");if(!o.parentName)return fail("Enter your name.");
+      if(!finishing){if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(o.email))return fail("Enter a valid email address.");if(o.password.length<6)return fail("The password needs at least 6 characters.");if(o.password!==String(fd.get("password2")||""))return fail("The two passwords don't match.");}
+      var s=await store.register(o);ui.tab="kids";setSession(s);go("parent");toast("Welcome! Now add your kids.");return;
+    }
+    if(kind==="login"){
+      var em=String(fd.get("email")||"").trim(),pw=String(fd.get("password")||"");if(!em||!pw)return fail("Enter your email and password.");
+      var s2=await store.loginParent(em,pw);if(s2.role==="kid"){await store.logout();return fail("That's a kid account. Use the Kid login page.");}
+      ui.tab="overview";setSession(s2);go(s2.role?"parent":"register");return;
+    }
+    if(kind==="kidlogin"){
+      var code=String(fd.get("code")||"").trim().toUpperCase(),un=String(fd.get("username")||"").trim().toLowerCase(),kp=String(fd.get("password")||"");
+      if(!/^[A-Z0-9]{6}$/.test(code))return fail("The family code has 6 letters and numbers.");if(!un||!kp)return fail("Enter your username and password.");
+      var s3=await store.loginKid(code,un,kp);try{localStorage.setItem(LAST_FAMILY,code);}catch(x){}
+      setSession(s3);go("me");return;
+    }
+  }catch(e){console.error(e);fail(friendly(e));}
+  finally{if(btn&&btn.isConnected)btn.disabled=false;}
 });
-dlg.addEventListener("close",function(){dlgHandler=null;});
 
-load();
-render();
+
+store.init(function(s){setSession(s);}).catch(function(e){console.error(e);app.innerHTML='<div class="card empty"><h1>Couldn\'t start</h1><p>The site couldn\'t connect to its online service. Check your internet connection and reload the page.</p></div>';});
+
 })();
 </script>
 </body>
